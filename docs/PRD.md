@@ -135,16 +135,17 @@ RESERVED ──cancel──▶ CANCELLED
 5. Anulowanie zwalnia dokładnie tyle, ile zostało zarezerwowane, i tylko raz.
 6. Spójność z historią: `onHand` = suma `RECEIPT`; `reserved` = suma `RESERVATION` − suma `RELEASE` (dla produktu i magazynu).
 
-### 6.1 [DECYZJA] Mechanizm rezerwacji (jak pilnujemy reguł 1, 2, 4)
+### 6.1 [DECYZJA] Mechanizm rezerwacji (jak pilnujemy reguł 1, 2, 4, 5)
 
-Uzasadnienie i odrzucone alternatywy: [ADR 0001](adr/0001-reservation-conditional-update.md).
+Uzasadnienie i odrzucone alternatywy: [ADR 0001](adr/0001-stock-reservation-locking.md).
 
 - Każda pozycja zamówienia rezerwowana jest jednym warunkowym `UPDATE`:
   `UPDATE stock_level SET reserved = reserved + :qty WHERE product_id = :p AND warehouse_id = :w AND on_hand - reserved >= :qty`.
   Zmieniony 1 wiersz → zarezerwowano; 0 wierszy → brak towaru. Sprawdzenie i zapis to jeden krok w bazie, więc nie ma przerwy między odczytem a zapisem, w którą mogłoby wejść inne żądanie. PostgreSQL blokuje zmieniony wiersz do końca transakcji, więc równoczesne rezerwacje tego samego produktu ustawiają się w kolejce i każda widzi świeży stan.
 - Wszystkie pozycje zamówienia w jednej transakcji; pierwsza pozycja bez towaru → rollback całości (wszystko albo nic).
 - Pozycje są przetwarzane w stałej kolejności — posortowane po ID produktu. Zapobiega to deadlockom: dwie transakcje nigdy nie blokują tych samych wierszy w przeciwnej kolejności.
-- Anulowanie działa symetrycznie (`reserved = reserved - :qty`), w tej samej kolejności.
+- Anulowanie zmienia status warunkowym `UPDATE orders SET status = 'CANCELLED' WHERE id = :id AND status = 'RESERVED'`. Towar (`reserved = reserved - :qty`, w tej samej kolejności co przy rezerwacji) zwalniany jest w tej samej transakcji i tylko wtedy, gdy ten `UPDATE` zmienił 1 wiersz. Dzięki temu dwa równoczesne anulowania nie zwolnią towaru dwa razy (reguła 5). Odczyt encji i sprawdzenie statusu w Javie przed `save()` tej gwarancji nie daje.
+- Transakcje rezerwacji i anulowania działają w izolacji `READ COMMITTED` (domyślnej w PostgreSQL i Springu). Na niej opiera się poprawność: `UPDATE`, który czekał na blokadę wiersza, ponownie sprawdza `WHERE` na świeżej wersji wiersza. Przy `REPEATABLE READ` / `SERIALIZABLE` większość równoczesnych żądań dostaje błąd serializacji (`40001`) i sklep odmawia, choć ma towar. Izolacji nie wolno zmieniać.
 - Druga linia obrony w schemacie: `CHECK (reserved >= 0 AND reserved <= on_hand)`.
 - Odrzucone alternatywy: optimistic locking (`@Version` + retry) — przy dużej rywalizacji o jeden wiersz prawie każde żądanie dostaje konflikt, wymaga limitu prób i daje fałszywe odrzucenia; `SELECT … FOR UPDATE` — poprawne, ale więcej kodu i ten sam problem kolejności blokad, bez zysku względem warunkowego `UPDATE`.
 
@@ -171,7 +172,7 @@ Płatności, wysyłka i realizacja zamówień, zapis i statystyki odrzuconych za
 
 ## 10. Otwarte pytania (do `/grill-with-docs`)
 
-1. ✅ *Rozstrzygnięte — patrz 6.1.* **Mechanizm blokady przy rezerwacji:** optimistic locking (`@Version` + retry), pessimistic locking (`SELECT … FOR UPDATE`) czy atomowy `UPDATE … WHERE onHand - reserved >= :qty`? Jakie są kompromisy przy wielopozycyjnych zamówieniach (kolejność blokad, deadlocki)?
+1. ✅ *Rozstrzygnięte — patrz 6.1 i [ADR 0001](adr/0001-stock-reservation-locking.md).* **Mechanizm blokady przy rezerwacji:** warunkowy `UPDATE … WHERE on_hand - reserved >= :qty`, wszystkie pozycje w jednej transakcji, posortowane po ID produktu (brak deadlocków). Optimistic locking odrzucony (konflikty i fałszywe odmowy przy dużej rywalizacji), `SELECT … FOR UPDATE` odrzucony (więcej kodu, bez zysku). Zweryfikowane prototypem (branch `prototype/stock-locking`).
 2. ✅ *Rozstrzygnięte — patrz 5.3.* **Odrzucone zamówienia:** nie zapisywać ich wcale czy zapisywać ze statusem `REJECTED` (audyt, statystyki)?
 3. ✅ *Rozstrzygnięte — patrz 5.3.* **Idempotencja tworzenia zamówienia:** czy klient API może ponowić `POST` po timeoucie bez ryzyka podwójnego zamówienia (np. nagłówek `Idempotency-Key`)? W v1 czy później?
 4. ✅ *Rozstrzygnięte — patrz 5.3.* **Wygasanie rezerwacji:** czy rezerwacja bez dalszego kroku ma kiedyś wygasać? Jeśli w v1 nie ma płatności, czy `RESERVED` to stan końcowy?
