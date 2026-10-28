@@ -1,6 +1,6 @@
 # Rezerwacja towaru przez warunkowy UPDATE z ustaloną kolejnością blokad
 
-Status: accepted (2026-10-25; warunki dotyczące izolacji i anulowania dodane po prototypie 2026-10-27)
+Status: accepted (2026-10-25; warunki dotyczące izolacji i anulowania dodane po prototypie 2026-10-27; zbieranie braków ze wszystkich linii doprecyzowane 2026-10-28)
 
 ## Kontekst
 
@@ -20,8 +20,8 @@ Mamy więc dużą rywalizację o jeden wiersz `stock_level` i zamówienia blokuj
 
 1. Każdą pozycję zamówienia rezerwujemy jednym warunkowym `UPDATE`:
    `UPDATE stock_level SET reserved = reserved + :qty WHERE product_id = :p AND warehouse_id = :w AND on_hand - reserved >= :qty`.
-   1 zmieniony wiersz → zarezerwowano; 0 wierszy → brak towaru (także gdy wiersza `stock_level` nie ma, zgodnie z PRD 5.3).
-2. Wszystkie pozycje zamówienia idą w jednej transakcji; pierwsza pozycja bez towaru → rollback całości.
+   1 zmieniony wiersz → zarezerwowano; 0 wierszy → brak towaru (także, gdy wiersza `stock_level` nie ma, zgodnie z PRD 5.3).
+2. Wszystkie pozycje zamówienia idą w jednej transakcji; jeśli którejkolwiek pozycji brakuje → rollback całości. Pętla nie przerywa się na pierwszym braku: warunkowy `UPDATE` wykonujemy dla każdej linii, braki zbieramy ze wszystkich linii (do odpowiedzi 409), a potem wycofujemy transakcję. Kolejność blokad się nie zmienia; odrzucane zamówienie trzyma blokady nieco dłużej, co w v1 jest pomijalne.
 3. Pozycje przetwarzamy w kolejności posortowanej po ID produktu.
 4. Transakcje rezerwacji i anulowania działają w izolacji **`READ COMMITTED`** (domyślnej w PostgreSQL i Springu).
 5. Anulowanie zmienia status warunkowym `UPDATE orders SET status = 'CANCELLED' WHERE id = :id AND status = 'RESERVED'`. Towar (`reserved = reserved - :qty`, w tej samej kolejności co przy rezerwacji) zwalniamy w tej samej transakcji i tylko wtedy, gdy ten `UPDATE` zmienił 1 wiersz.
