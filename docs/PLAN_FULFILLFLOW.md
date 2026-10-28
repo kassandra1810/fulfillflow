@@ -1,6 +1,6 @@
 # FulfillFlow — plan roboczy
 
-> Zasada: budujemy małe, działające fragmenty, prowadzone workflowem Matta Pococka (AI Hero, „AI Skills for Real Engineers”). Plan aktualizujemy tylko wtedy, gdy jest to potrzebne do kolejnego kroku. Jeśli lekcja kursu mówi inaczej niż ten plan, **wygrywa lekcja**, a plan poprawiamy.
+> Zasada: budujemy małe, działające fragmenty, prowadzone workflowem Matta Pococka (AI Hero, „AI Skills for Real Engineers”). Status lekcji: ✅ zrobione, 🔄 w toku. Plan aktualizujemy tylko wtedy, gdy jest to potrzebne do kolejnego kroku. Jeśli lekcja kursu mówi inaczej niż ten plan, **wygrywa lekcja**, a plan poprawiamy.
 
 ## Cel
 
@@ -11,8 +11,9 @@
 
 - Java 25 LTS, Spring Boot 4.x, Maven
 - PostgreSQL, Spring Data JPA / Hibernate, Flyway
-- REST API, JUnit + Testcontainers, Docker Compose, GitHub Actions
-- Moduły: Catalog → Inventory → Orders
+- REST API z dokumentacją OpenAPI, JUnit + Testcontainers, Docker Compose, GitHub Actions
+- Spring Modulith (weryfikacja granic modułów w `./mvnw verify`)
+  - Moduły: Catalog → Inventory → Orders
 
 **Nie teraz:** Kafka, mikroserwisy, Keycloak, AWS, Terraform, Grafana, frontend (patrz: Parking lot).
 
@@ -32,7 +33,7 @@
 
 Tempo: jedna lekcja na 1–3 dni. Odpowiadam na pytanie z lekcji dopiero, gdy zrobię ćwiczenie na FulfillFlow.
 
-### Lekcja 1 — instalacja i fundament
+### Lekcja 1 — instalacja i fundament ✅
 **Kurs:** instalacja skilli, wybór ścieżki (*My own workflows*).
 **Aplikacja — FF-001: szkielet usługi**
 - Projekt `platform-api` ze https://start.spring.io/ (Maven, Java 25, Spring Boot 4.x; Spring Web, Actuator, Validation).
@@ -43,7 +44,7 @@ Tempo: jedna lekcja na 1–3 dni. Odpowiadam na pytanie z lekcji dopiero, gdy zr
 
 **Gotowe, gdy:** `./mvnw test` przechodzi, `GET /actuator/health` zwraca `UP`, CI zielone, pierwszy commit `chore: bootstrap Spring Boot application`.
 
-### Lekcja 2 — `/grill-with-docs`: wymagania bez mgły
+### Lekcja 2 — `/grill-with-docs`: wymagania bez mgły ✅
 **Aplikacja:** sesja grillowania na `docs/PRD.md`.
 - Przechodzę przez otwarte pytania z PRD i założenia **[ZAŁOŻENIE]**.
 - Decyzje podejmuję ja; agent pyta, kwestionuje i proponuje alternatywy.
@@ -51,7 +52,7 @@ Tempo: jedna lekcja na 1–3 dni. Odpowiadam na pytanie z lekcji dopiero, gdy zr
 
 **Gotowe, gdy:** w PRD nie ma niejasności poza tymi, które świadomie zostawiam do prototypu.
 
-### Lekcja 3 — `/prototype` i `/handoff`: sprawdź niepewne
+### Lekcja 3 — `/prototype` i `/handoff`: sprawdź niepewne ✅
 **Aplikacja:** prototyp najbardziej ryzykownej części — **rezerwacja ostatnich sztuk przy równoczesnych zamówieniach**.
 - Osobny branch `prototype/stock-locking`, kod do wyrzucenia.
 - Porównanie: optimistic locking vs `SELECT … FOR UPDATE` vs atomowy `UPDATE … WHERE`, test 100 równoczesnych żądań na 5 sztuk (Testcontainers + PostgreSQL).
@@ -60,16 +61,18 @@ Tempo: jedna lekcja na 1–3 dni. Odpowiadam na pytanie z lekcji dopiero, gdy zr
 
 **Gotowe, gdy:** wiem, który mechanizm wybieram, umiem wyjaśnić dlaczego i w jakich warunkach zawiedzie. Branch prototypu nie trafia do `main`.
 
-### Lekcja 4 — `/to-spec` i `/to-tickets`: duża praca w małych kawałkach
+### Lekcja 4 — `/to-spec` i `/to-tickets`: duża praca w małych kawałkach 🔄
 **Aplikacja:**
 - `/to-spec` z PRD + ADR → specyfikacja v1 w `docs/specs/`.
-- `/to-tickets` → backlog vertical slices (zastępuje wstępną listę FF-002…FF-006 poniżej).
-- Porównuję wygenerowane tickety ze swoją wstępną listą: co agent zrobił lepiej, czego brakuje.
+- `/to-tickets` → backlog vertical slices (zastępuje wstępną listę FF-002…FF-007; patrz „Backlog v1”).
+- Porównuję wygenerowane tickety ze swoją wstępną listą: co agent zrobił lepiej, czego brakuje. Wstępna lista i zestawienie z T01–T13 są w `docs/LEARNING_LOG.md`.
+
+Status: spec i tickety gotowe; zostały moje wnioski z porównania w `LEARNING_LOG.md`.
 
 **Gotowe, gdy:** każdy ticket ma kryteria akceptacji, jest mały (≈ jedna sesja) i da się go przetestować niezależnie.
 
 ### Lekcja 5 — Sandcastle: agent pracuje sam, bezpiecznie
-**Aplikacja:** pierwszy ticket z backlogu (np. tworzenie produktu) realizowany przez agenta AFK w Sandcastle.
+**Aplikacja:** pierwszy ticket z backlogu — T01 (utworzenie i odczyt produktu) — realizowany przez agenta AFK w Sandcastle.
 - Agent pracuje na osobnym branchu, ja w tym czasie nie ingeruję.
 - Agent musi uruchamiać `./mvnw verify` jako pętlę zwrotną.
 
@@ -84,7 +87,7 @@ Tempo: jedna lekcja na 1–3 dni. Odpowiadam na pytanie z lekcji dopiero, gdy zr
 **Gotowe, gdy:** ticket zmergowany, CI zielone, instrukcje dla agenta zaktualizowane.
 
 ### Lekcja 7 — pełna pętla
-**Aplikacja:** kolejny ficzer przechodzi cały cykl od grillowania do review — najlepiej **zamówienia z rezerwacją** (z mechanizmem z ADR 0001).
+**Aplikacja:** kolejny ficzer przechodzi cały cykl do review — najlepiej **zamówienia z rezerwacją**: T08–T10 (z mechanizmem z ADR 0001). Spec i tickety już są, więc cykl zaczyna się od implementacji; `/grill-with-docs` tylko wtedy, gdy w trakcie wyjdą niejasności.
 
 **Gotowe, gdy:** ficzer działa, a ja mam spisany swój workflow w `docs/LEARNING_LOG.md`.
 
@@ -106,14 +109,9 @@ Zasady stałe:
 - Agent zawsze uruchamia testy; ja zawsze uruchamiam aplikację i sprawdzam działanie.
 - Nie merguję kodu, którego nie umiem wyjaśnić.
 
-## Wstępny backlog (szkic — zastąpi go `/to-tickets` w lekcji 4)
+## Backlog v1
 
-- **FF-002:** `POST /api/v1/products` — PostgreSQL, Flyway, test z Testcontainers
-- **FF-003:** `GET /api/v1/products` — paginacja
-- **FF-004:** przyjęcie towaru i odczyt stanu
-- **FF-005:** utworzenie zamówienia z rezerwacją (wszystko albo nic)
-- **FF-006:** test równoczesnych rezerwacji ostatnich sztuk
-- **FF-007:** anulowanie zamówienia (idempotentne)
+Backlog v1 to tickety T01–T13 w [GitHub Issues](https://github.com/kassandra1810/fulfillflow/issues?q=is%3Aissue+label%3Aready-for-agent) (numer T w tytule; zależności jako „blocked by”), utworzone z [`docs/specs/core-v1.md`](specs/core-v1.md).
 
 ## Definicja końca v1
 
