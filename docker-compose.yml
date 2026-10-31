@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: fulfillflow
+      POSTGRES_USER: fulfillflow
+      POSTGRES_PASSWORD: fulfillflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - fulfillflow-pgdata:/var/lib/postgresql/data
+
+volumes:
+  fulfillflow-pgdata:
