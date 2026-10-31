@@ -53,6 +53,7 @@ Skip any issue that already has a comment starting with `Sandcastle branch:` —
    - List key decisions made
    - List files changed
    - Note any blockers for the next iteration
+   - NOT contain any AI attribution: no `Co-Authored-By:` trailer, no "Generated with Claude Code" line. The same applies to issue comments.
 6. **Comment** — add a comment to the issue with `gh issue comment <ID> --body "..."`. The body MUST start with `Sandcastle branch: <branch>` (get the name from `git branch --show-current`), followed by a short summary of the changes (a few bullet points: what changed and which tests were added).
 
 ## Rules

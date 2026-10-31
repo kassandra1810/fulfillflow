@@ -62,7 +62,7 @@ If you find improvements to make:
 
 1. Make the changes directly on this branch
 2. Run the commands from the Verification section above to ensure nothing is broken
-3. Commit describing the refinements
+3. Commit describing the refinements, without any AI attribution (no `Co-Authored-By:` trailer, no "Generated with Claude Code" line)
 
 If the code is already clean and well-structured, do nothing.
 
