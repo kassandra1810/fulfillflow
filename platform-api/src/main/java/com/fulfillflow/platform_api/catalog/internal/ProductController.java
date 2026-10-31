@@ -1,5 +1,6 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class ProductController {
 	}
 
 	@PostMapping
-	ResponseEntity<ProductResponse> create(@RequestBody CreateProductRequest request) {
+	ResponseEntity<ProductResponse> create(@Valid @RequestBody CreateProductRequest request) {
 		Product product = service.create(request.sku(), request.name(), request.description(), request.price());
 		ProductResponse body = ProductResponse.from(product);
 		return ResponseEntity.created(URI.create("/api/v1/products/" + product.getId())).body(body);
@@ -29,9 +30,7 @@ public class ProductController {
 
 	@GetMapping("/{id}")
 	ResponseEntity<ProductResponse> get(@PathVariable UUID id) {
-		return service.findById(id)
-				.map(ProductResponse::from)
-				.map(ResponseEntity::ok)
-				.orElseGet(() -> ResponseEntity.notFound().build());
+		Product product = service.findById(id).orElseThrow(() -> new ProductNotFoundException(id));
+		return ResponseEntity.ok(ProductResponse.from(product));
 	}
 }
