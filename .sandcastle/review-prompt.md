@@ -19,12 +19,12 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 
 # Verification
 
-After every change, from inside `platform-api/`:
+Inside the sandbox, after every change, from inside `platform-api/`:
 
 1. Run `./mvnw -B compile test-compile` and make sure it succeeds (main and test code must compile).
-2. Run the unit tests with `./mvnw -B test` and make sure they pass.
+2. Run `./mvnw -B test` and make sure it passes (only fast tests without Docker, if there are any).
 
-Do NOT run tests that use Testcontainers (and do not run `./mvnw verify`, which runs integration tests). There is no Docker inside this sandbox, so those tests cannot start their containers and will fail for reasons unrelated to your change. If you write a test that needs Testcontainers, name it `*IT.java` so it is treated as an integration test, make sure it compiles, and leave running it to CI. If a Testcontainers test is picked up by `./mvnw -B test`, exclude it (e.g. `-Dtest='!SomeIT'`) rather than trying to make it pass.
+There is no Docker inside this sandbox, so `*IT` tests (Testcontainers) and `./mvnw verify` cannot run here — do not try, and do not exclude or weaken them. After your run, the orchestrator runs `./mvnw -B verify` on the host, with Docker, including every `*IT` test. If it fails, you will get its output and a chance to fix the branch. Do not add extra tests just to have something runnable in the sandbox (e.g. `@WebMvcTest` slices duplicating `*IT` cases) — follow the Testing rules in @.sandcastle/CODING_STANDARDS.md.
 
 # REVIEW PROCESS
 
