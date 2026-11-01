@@ -1,5 +1,6 @@
 package com.fulfillflow.platform_api.catalog;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,7 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -71,7 +78,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andReturn();
 
 		// Exactly two decimal places, trailing zero preserved (not 19.9).
-		org.assertj.core.api.Assertions.assertThat(created.getResponse().getContentAsString())
+		assertThat(created.getResponse().getContentAsString())
 				.contains("\"price\":19.90");
 
 		String id = readId(created);
@@ -80,7 +87,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(status().isOk())
 				.andReturn();
 
-		org.assertj.core.api.Assertions.assertThat(fetched.getResponse().getContentAsString())
+		assertThat(fetched.getResponse().getContentAsString())
 				.contains("\"price\":19.90");
 	}
 
@@ -115,7 +122,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.errors.name").exists());
 
-		org.assertj.core.api.Assertions.assertThat(productCount("SKU-EMPTY-NAME")).isZero();
+		assertThat(productCount("SKU-EMPTY-NAME")).isZero();
 	}
 
 	@Test
@@ -131,7 +138,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.errors.sku").exists());
 
-		org.assertj.core.api.Assertions.assertThat(totalProducts()).isEqualTo(before);
+		assertThat(totalProducts()).isEqualTo(before);
 	}
 
 	@Test
@@ -145,7 +152,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.errors.price").exists());
 
-		org.assertj.core.api.Assertions.assertThat(productCount("SKU-ZERO")).isZero();
+		assertThat(productCount("SKU-ZERO")).isZero();
 	}
 
 	@Test
@@ -159,7 +166,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.errors.price").exists());
 
-		org.assertj.core.api.Assertions.assertThat(productCount("SKU-NEG")).isZero();
+		assertThat(productCount("SKU-NEG")).isZero();
 	}
 
 	@Test
@@ -174,7 +181,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(jsonPath("$.errors.price").exists());
 
 		// No silent rounding: nothing was stored.
-		org.assertj.core.api.Assertions.assertThat(productCount("SKU-3DP")).isZero();
+		assertThat(productCount("SKU-3DP")).isZero();
 	}
 
 	@Test
@@ -196,7 +203,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.detail").exists());
 
-		org.assertj.core.api.Assertions.assertThat(productCount("SKU-DUP")).isEqualTo(1);
+		assertThat(productCount("SKU-DUP")).isEqualTo(1);
 	}
 
 	@Test
@@ -207,6 +214,121 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(status().isNotFound())
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.detail").exists());
+	}
+
+	@Test
+	void concurrentCreatesWithSameSkuGiveOne201AndOnly409s() throws Exception {
+		int requests = 8;
+		CountDownLatch start = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(requests);
+		try {
+			List<Future<Integer>> statuses = new ArrayList<>();
+			for (int i = 0; i < requests; i++) {
+				statuses.add(executor.submit(() -> {
+					start.await();
+					return mockMvc.perform(post("/api/v1/products")
+									.contentType(MediaType.APPLICATION_JSON)
+									.content("""
+											{"sku":"SKU-RACE","name":"Raced","price":3.00}
+											"""))
+							.andReturn().getResponse().getStatus();
+				}));
+			}
+			start.countDown();
+
+			List<Integer> results = new ArrayList<>();
+			for (Future<Integer> status : statuses) {
+				results.add(status.get());
+			}
+			assertThat(results).containsOnly(201, 409);
+			assertThat(results).filteredOn(code -> code == 201).hasSize(1);
+		} finally {
+			executor.shutdownNow();
+		}
+		assertThat(productCount("SKU-RACE")).isEqualTo(1);
+	}
+
+	@Test
+	void trimsSkuSoPaddedDuplicateIsRejectedWith409() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"  SKU-TRIM  ","name":"Padded","price":4.00}
+								"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.sku").value("SKU-TRIM"));
+
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-TRIM","name":"Plain","price":4.00}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.sku").value("SKU-TRIM"));
+
+		assertThat(productCount("SKU-TRIM")).isEqualTo(1);
+	}
+
+	@Test
+	void treatsSkuCaseSensitively() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-CASE","name":"Upper","price":2.00}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"sku-case","name":"Lower","price":2.00}
+								"""))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void rejectsSkuLongerThan64With400AndAddsNothing() throws Exception {
+		String sku = "S".repeat(65);
+
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"%s","name":"Long sku","price":1.00}
+								""".formatted(sku)))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.sku").exists());
+
+		assertThat(productCount(sku)).isZero();
+	}
+
+	@Test
+	void rejectsNameLongerThan255With400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-LONG-NAME","name":"%s","price":1.00}
+								""".formatted("N".repeat(256))))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		assertThat(productCount("SKU-LONG-NAME")).isZero();
+	}
+
+	@Test
+	void rejectsMissingNameWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-NO-NAME","price":1.00}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		assertThat(productCount("SKU-NO-NAME")).isZero();
 	}
 
 	private long totalProducts() {

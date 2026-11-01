@@ -1,4 +1,4 @@
-package com.fulfillflow.platform_api.catalog.internal;
+package com.fulfillflow.platform_api.web;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -9,18 +9,19 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
- * Translates catalog errors into RFC 9457 Problem Details responses. Bean
- * validation failures become 400 with a per-field {@code errors} map; a
- * duplicate {@code sku} becomes 409 and an unknown product id becomes 404.
+ * The single place that renders API errors as RFC 9457 Problem Details, for
+ * every module. Bean validation failures become 400 with a per-field
+ * {@code errors} map. Modules signal domain errors (404, 409, ...) by throwing
+ * an {@link org.springframework.web.ErrorResponseException} that carries its
+ * own status and Problem Detail, so this package depends on no module.
  */
 @RestControllerAdvice
-class ProductExceptionHandler extends ResponseEntityExceptionHandler {
+class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@Override
 	protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -39,20 +40,5 @@ class ProductExceptionHandler extends ResponseEntityExceptionHandler {
 		body.setProperty("errors", errors);
 
 		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
-	}
-
-	@ExceptionHandler(DuplicateSkuException.class)
-	ProblemDetail handleDuplicateSku(DuplicateSkuException ex) {
-		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-		body.setTitle("Duplicate sku");
-		body.setProperty("sku", ex.getSku());
-		return body;
-	}
-
-	@ExceptionHandler(ProductNotFoundException.class)
-	ProblemDetail handleProductNotFound(ProductNotFoundException ex) {
-		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-		body.setTitle("Product not found");
-		return body;
 	}
 }

@@ -98,6 +98,7 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 - Każdy moduł wystawia mały publiczny interfejs w pakiecie głównym modułu; encje, repozytoria i implementacja są w podpakietach wewnętrznych. Między modułami przechodzą tylko ID i proste rekordy, nigdy encje.
 - Kierunek zależności: `orders → catalog`, `orders → inventory`, `inventory → catalog`. `catalog` nie zależy od nikogo. Brak cykli.
 - Granice pilnuje Spring Modulith (`ApplicationModules.of(...).verify()` w `./mvnw verify`).
+- **[SPEC]** Wspólny format błędów (Problem Details: 400 walidacji z mapą `errors`, nieparsowalne body) jest w jednym miejscu: pakiet `web` (`ApiExceptionHandler`). Moduły zgłaszają błędy domenowe (404, 409, …) wyjątkami `ErrorResponseException`, które niosą własny status i Problem Detail, więc `web` nie zależy od żadnego modułu.
 - Nowe zależności w stosie (PRD 7): PostgreSQL, Spring Data JPA / Hibernate, Flyway, Spring Modulith, generator OpenAPI, Testcontainers.
 
 ### Publiczne interfejsy modułów
@@ -114,7 +115,7 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 ### Model danych
 
 - Wszystkie encje mają identyfikator UUIDv7, nadawany w aplikacji przed zapisem (PRD 5.4).
-- `Product`: `id`, `sku` (unikalny indeks), `name`, `description` (nullable), `price` (decimal, skala 2, `> 0`), `version`.
+- `Product`: `id`, `sku` (unikalny indeks, max 64 znaki), `name` (max 255 znaków), `description` (nullable), `price` (decimal, skala 2, `> 0`), `version`.
 - `Warehouse`: `id`; jeden wiersz — magazyn domyślny — tworzony migracją.
 - `StockLevel`: per produkt × magazyn; `on_hand`, `reserved`; ograniczenie `CHECK (reserved >= 0 AND reserved <= on_hand)`. Wiersz powstaje przy pierwszym przyjęciu towaru.
 - `StockReceipt`: `id`, produkt, magazyn, ilość, czas.
@@ -139,6 +140,8 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 | `POST /orders/{id}/cancel` **[SPEC]** | 200, zamówienie w statusie `CANCELLED` (także przy ponownym anulowaniu) | 404 |
 
 - Wszystkie błędy w formacie Problem Details. 400 zawiera opis pól.
+- **[SPEC]** `sku`: białe znaki na początku i końcu są usuwane przed zapisem i sprawdzeniem duplikatu (`" SKU-1 "` to ten sam produkt co `"SKU-1"` → 409); wielkość liter ma znaczenie (`"sku-1"` ≠ `"SKU-1"`). `sku` dłuższe niż 64 znaki lub `name` dłuższa niż 255 → 400.
+- **[SPEC]** Duplikat `sku` daje 409 także przy równoczesnych żądaniach — unikalność pilnuje indeks w bazie, nie sprawdzenie przed zapisem.
 - 409 z braku towaru zawiera listę brakujących pozycji: `sku`, `requested`, `available` (migawka z chwili odrzucenia).
 - Cena w API to sama kwota (bez pola `currency`).
 - API nie przyjmuje ani nie zwraca magazynu.
@@ -246,6 +249,7 @@ Płatności; wysyłka i realizacja zamówień; zapis i statystyki odrzuconych za
 ## Dalsze uwagi
 
 - Decyzje **[SPEC]** podjęte 2026-10-28: ścieżki `POST /stock-receipts`, `GET /products/{id}/stock`, `POST /orders/{id}/cancel`; `version` jako pole w treści `PATCH`; „ta sama treść” przy `Idempotency-Key` = zbiór linii bez względu na kolejność; seamy testów jak wyżej.
+- Decyzje **[SPEC]** podjęte 2026-11-01 (review T02): reguły `sku` (trim, max 64, wielkość liter ma znaczenie), `name` max 255, równoczesny duplikat `sku` → 409, wspólny format błędów w pakiecie `web`.
 - Potwierdzone 2026-10-28: stan produktu nigdy nieprzyjętego to `0 / 0 / 0`; 409 z braku towaru zbiera wszystkie brakujące linie (doprecyzowane też w ADR 0001 i PRD 6.1); paginacja stronami jak wyżej.
 - Paginacja kursorem (keyset) dla historii ruchów to kandydat na v2, jeśli historia urośnie.
 - Najważniejsze ryzyko implementacji: anulowanie przez encję JPA i zmiana izolacji transakcji po cichu łamią gwarancje z ADR 0001 — oba przypadki mają mieć test.

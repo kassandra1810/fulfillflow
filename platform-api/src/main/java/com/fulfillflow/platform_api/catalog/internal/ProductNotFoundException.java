@@ -1,21 +1,24 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.ErrorResponseException;
 
 /**
- * Thrown when no product exists for a requested {@code id}. Mapped to HTTP 404
- * Not Found (Problem Details) by {@link ProductExceptionHandler}.
+ * Thrown when no product exists for a requested {@code id}. Carries its own
+ * 404 Problem Detail, rendered by the shared web error handling.
  */
-class ProductNotFoundException extends RuntimeException {
-
-	private final UUID id;
+class ProductNotFoundException extends ErrorResponseException {
 
 	ProductNotFoundException(UUID id) {
-		super("Product with id '" + id + "' not found");
-		this.id = id;
+		super(HttpStatus.NOT_FOUND, problem(id), null);
 	}
 
-	UUID getId() {
-		return id;
+	private static ProblemDetail problem(UUID id) {
+		ProblemDetail body = ProblemDetail.forStatusAndDetail(
+				HttpStatus.NOT_FOUND, "Product with id '" + id + "' not found");
+		body.setTitle("Product not found");
+		return body;
 	}
 }

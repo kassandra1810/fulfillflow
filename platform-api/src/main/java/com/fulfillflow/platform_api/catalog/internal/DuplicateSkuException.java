@@ -1,19 +1,24 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.ErrorResponseException;
+
 /**
  * Thrown when a product is created with a {@code sku} that already exists.
- * Mapped to HTTP 409 Conflict (Problem Details) by {@link ProductExceptionHandler}.
+ * Carries its own 409 Problem Detail, rendered by the shared web error handling.
  */
-class DuplicateSkuException extends RuntimeException {
-
-	private final String sku;
+class DuplicateSkuException extends ErrorResponseException {
 
 	DuplicateSkuException(String sku) {
-		super("Product with sku '" + sku + "' already exists");
-		this.sku = sku;
+		super(HttpStatus.CONFLICT, problem(sku), null);
 	}
 
-	String getSku() {
-		return sku;
+	private static ProblemDetail problem(String sku) {
+		ProblemDetail body = ProblemDetail.forStatusAndDetail(
+				HttpStatus.CONFLICT, "Product with sku '" + sku + "' already exists");
+		body.setTitle("Duplicate sku");
+		body.setProperty("sku", sku);
+		return body;
 	}
 }
