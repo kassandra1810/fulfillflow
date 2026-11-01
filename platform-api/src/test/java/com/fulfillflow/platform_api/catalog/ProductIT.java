@@ -1,6 +1,7 @@
 package com.fulfillflow.platform_api.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -89,6 +92,50 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 
 		assertThat(fetched.getResponse().getContentAsString())
 				.contains("\"price\":19.90");
+	}
+
+	@Test
+	void returnsPriceWithScale2FromPostAndGetForFewerDecimals() throws Exception {
+		MvcResult created = mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-SCALE","name":"One decimal","price":19.9}
+								"""))
+				.andExpect(status().isCreated())
+				.andReturn();
+
+		// POST and GET must return identical data: 19.90, not 19.9 then 19.90.
+		assertThat(created.getResponse().getContentAsString()).contains("\"price\":19.90");
+
+		MvcResult fetched = mockMvc.perform(get("/api/v1/products/{id}", readId(created)))
+				.andExpect(status().isOk())
+				.andReturn();
+		assertThat(fetched.getResponse().getContentAsString()).contains("\"price\":19.90");
+	}
+
+	@Test
+	void assignsUuidV7Ids() throws Exception {
+		MvcResult created = mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-UUID","name":"Identified","price":1.00}
+								"""))
+				.andExpect(status().isCreated())
+				.andReturn();
+
+		UUID id = UUID.fromString(readId(created));
+		assertThat(id.version()).isEqualTo(7);
+		assertThat(id.variant()).isEqualTo(2);
+	}
+
+	@Test
+	void databaseRejectsNonPositivePriceAsSecondLineOfDefence() {
+		assertThatThrownBy(() -> jdbcTemplate.update(
+				"INSERT INTO product (id, sku, name, price, version) VALUES (?, ?, ?, ?, 0)",
+				UUID.randomUUID(), "SKU-DB-ZERO", "Zero in DB", BigDecimal.ZERO))
+				.isInstanceOf(DataIntegrityViolationException.class);
+
+		assertThat(productCount("SKU-DB-ZERO")).isZero();
 	}
 
 	@Test
