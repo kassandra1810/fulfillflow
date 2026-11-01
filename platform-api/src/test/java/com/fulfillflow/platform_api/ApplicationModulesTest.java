@@ -1,5 +1,7 @@
 package com.fulfillflow.platform_api;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
@@ -11,8 +13,18 @@ import org.springframework.modulith.core.ApplicationModules;
  */
 class ApplicationModulesTest {
 
+	private final ApplicationModules modules = ApplicationModules.of(PlatformApiApplication.class);
+
+	@Test
+	void detectsTheExpectedModules() {
+		// Without this, verify() would pass vacuously if a package move left it
+		// detecting no modules at all.
+		assertThat(modules.getModuleByName("catalog")).isPresent();
+		assertThat(modules.getModuleByName("web")).isPresent();
+	}
+
 	@Test
 	void verifiesModuleBoundaries() {
-		ApplicationModules.of(PlatformApiApplication.class).verify();
+		modules.verify();
 	}
 }
