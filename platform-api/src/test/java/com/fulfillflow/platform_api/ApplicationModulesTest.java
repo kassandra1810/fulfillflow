@@ -20,6 +20,8 @@ class ApplicationModulesTest {
 		// Without this, verify() would pass vacuously if a package move left it
 		// detecting no modules at all.
 		assertThat(modules.getModuleByName("catalog")).isPresent();
+		assertThat(modules.getModuleByName("inventory")).isPresent();
+		assertThat(modules.getModuleByName("shared")).isPresent();
 		assertThat(modules.getModuleByName("web")).isPresent();
 	}
 

@@ -1,0 +1,39 @@
+package com.fulfillflow.platform_api.inventory.internal;
+
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Inventory HTTP endpoints: receiving stock and reading a product's stock. Both
+ * use the module's internal {@link StockService}; existence of the product is
+ * checked through the catalog's public API, yielding 404 for an unknown one.
+ */
+@RestController
+@RequestMapping("/api/v1")
+class StockController {
+
+	private final StockService service;
+
+	StockController(StockService service) {
+		this.service = service;
+	}
+
+	@PostMapping("/stock-receipts")
+	ResponseEntity<StockReceiptResponse> receive(@Valid @RequestBody StockReceiptRequest request) {
+		StockReceipt receipt = service.receive(request.productId(), request.quantity());
+		return ResponseEntity.status(HttpStatus.CREATED).body(StockReceiptResponse.from(receipt));
+	}
+
+	@GetMapping("/products/{id}/stock")
+	ResponseEntity<StockLevelResponse> stock(@PathVariable UUID id) {
+		return ResponseEntity.ok(service.stockOf(id));
+	}
+}

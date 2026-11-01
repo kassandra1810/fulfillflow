@@ -1,5 +1,6 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
+import com.fulfillflow.platform_api.shared.UuidV7;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-package com.fulfillflow.platform_api.catalog.internal;
+package com.fulfillflow.platform_api.shared;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
