@@ -1,5 +1,6 @@
 package com.fulfillflow.platform_api.inventory;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -7,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
+import com.jayway.jsonpath.JsonPath;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.RequestBuilder;
 
 @AutoConfigureMockMvc
 class StockIT extends AbstractPostgresIntegrationTest {
@@ -49,8 +52,8 @@ class StockIT extends AbstractPostgresIntegrationTest {
 				.andReturn();
 
 		UUID id = UUID.fromString(readJsonId(created));
-		org.assertj.core.api.Assertions.assertThat(id.version()).isEqualTo(7);
-		org.assertj.core.api.Assertions.assertThat(id.variant()).isEqualTo(2);
+		assertThat(id.version()).isEqualTo(7);
+		assertThat(id.variant()).isEqualTo(2);
 	}
 
 	@Test
@@ -170,7 +173,7 @@ class StockIT extends AbstractPostgresIntegrationTest {
 				.andExpect(jsonPath("$.onHand").value(0));
 	}
 
-	private org.springframework.test.web.servlet.RequestBuilder receipt(String productId, int quantity) {
+	private RequestBuilder receipt(String productId, int quantity) {
 		return post("/api/v1/stock-receipts")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
@@ -191,6 +194,6 @@ class StockIT extends AbstractPostgresIntegrationTest {
 	}
 
 	private String readJsonId(MvcResult result) throws Exception {
-		return com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+		return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
 	}
 }
