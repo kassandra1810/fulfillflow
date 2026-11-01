@@ -11,9 +11,9 @@
 
 ## Testy
 ```bash
-cd platform-api && ./mvnw verify
+cd platform-api && ./mvnw clean verify
 ```
 
 ## Zasady
-- Po każdej zmianie uruchom `./mvnw verify` w katalogu `platform-api` i upewnij się, że przechodzi, zanim uznasz zadanie za skończone.
+- Po każdej zmianie uruchom `./mvnw clean verify` w katalogu `platform-api` i upewnij się, że przechodzi, zanim uznasz zadanie za skończone. `clean` jest konieczne: Maven nie usuwa z `target/` plików usuniętych lub przeniesionych w `src/` (klasy, testy, migracje Flyway), a ich stare kopie dają fałszywie zielony build.
 - CI (`.github/workflows/ci.yml`) uruchamia `./mvnw -B verify` na każdy push i pull request.

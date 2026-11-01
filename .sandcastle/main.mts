@@ -11,7 +11,7 @@
 // implementer and reviewer work on the same explicit branch.
 //
 // The sandbox has no Docker, so agents cannot run the *IT tests
-// (Testcontainers). After each phase the orchestrator runs `./mvnw -B verify`
+// (Testcontainers). After each phase the orchestrator runs `./mvnw -B clean verify`
 // on the host, in the sandbox's worktree, and on failure gives a fixer agent
 // the output, up to MAX_FIX_ATTEMPTS times.
 //

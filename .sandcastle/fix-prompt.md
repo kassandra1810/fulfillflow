@@ -1,6 +1,6 @@
 # TASK
 
-The orchestrator ran `./mvnw -B verify` on the host (with Docker, including every `*IT` test) for branch `{{BRANCH}}`, and it failed. Find the cause and fix it on this branch.
+The orchestrator ran `./mvnw -B clean verify` on the host (with Docker, including every `*IT` test) for branch `{{BRANCH}}`, and it failed. Find the cause and fix it on this branch.
 
 # CONTEXT
 
@@ -23,7 +23,7 @@ The orchestrator ran `./mvnw -B verify` on the host (with Docker, including ever
 # RULES
 
 - Fix the real cause in production code, configuration or a genuinely wrong test. Never delete, disable, skip or weaken a test to make the build green, and do not change behaviour beyond what the original issue asked for.
-- There is no Docker in this sandbox: you cannot run `*IT` tests or `./mvnw verify`. Reason from the output above, then run `./mvnw -B compile test-compile` and `./mvnw -B test`. The orchestrator re-runs `verify` on the host after you finish.
+- There is no Docker in this sandbox: you cannot run `*IT` tests or `./mvnw verify`. Reason from the output above, then run `./mvnw -B clean test` (always `clean`: stale files in `target/` make builds falsely green). The orchestrator re-runs `clean verify` on the host after you finish.
 - Stay on the current branch: do not create, switch or rename branches, and do not push.
 - Commit the fix with a message starting with `RALPH: fix verify —` followed by the cause and the fix. No AI attribution (no `Co-Authored-By:` trailer, no "Generated with Claude Code" line).
 - If you cannot find the cause, do not commit; explain what you found.

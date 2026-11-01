@@ -19,10 +19,9 @@ The list above has already been filtered to issues ready for work and is the sol
 
 Inside the sandbox, after every change, from inside `platform-api/`:
 
-1. Run `./mvnw -B compile test-compile` and make sure it succeeds (main and test code must compile).
-2. Run `./mvnw -B test` and make sure it passes (only fast tests without Docker, if there are any).
+1. Run `./mvnw -B clean test` and make sure it passes. `clean` matters: Maven never removes files from `target/` that you deleted or moved in `src/` (old classes, tests, Flyway migrations), and stale copies there make builds falsely green. `test` compiles main and test code and runs the fast tests without Docker, if there are any.
 
-There is no Docker inside this sandbox, so `*IT` tests (Testcontainers) and `./mvnw verify` cannot run here — do not try, and do not exclude or weaken them. After your run, the orchestrator runs `./mvnw -B verify` on the host, with Docker, including every `*IT` test. If it fails, you will get its output and a chance to fix the branch. Do not add extra tests just to have something runnable in the sandbox (e.g. `@WebMvcTest` slices duplicating `*IT` cases) — follow the Testing rules in @.sandcastle/CODING_STANDARDS.md.
+There is no Docker inside this sandbox, so `*IT` tests (Testcontainers) and `./mvnw verify` cannot run here — do not try, and do not exclude or weaken them. After your run, the orchestrator runs `./mvnw -B clean verify` on the host, with Docker, including every `*IT` test. If it fails, you will get its output and a chance to fix the branch. Do not add extra tests just to have something runnable in the sandbox (e.g. `@WebMvcTest` slices duplicating `*IT` cases) — follow the Testing rules in @.sandcastle/CODING_STANDARDS.md.
 
 # Task
 
