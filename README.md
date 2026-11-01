@@ -35,6 +35,18 @@ curl -s http://localhost:8080/api/v1/products/<id>
 # 200 OK + ten sam produkt
 ```
 
+## Dokumentacja API (OpenAPI)
+Aplikacja udostępnia dokumentację OpenAPI wszystkich endpointów (generowaną przez springdoc):
+- dokument OpenAPI (JSON): `http://localhost:8080/v3/api-docs`
+- Swagger UI (przeglądarka): `http://localhost:8080/swagger-ui.html`
+
+## Architektura (moduły)
+Modularny monolit pilnowany przez Spring Modulith: moduły najwyższego poziomu (`catalog`, …)
+wystawiają mały publiczny interfejs (np. `CatalogApi`), a implementacja żyje w podpakietach
+wewnętrznych. Złamanie granicy modułu lub cykl zależności przerywa build — pilnuje tego test
+`ApplicationModulesTest` (`ApplicationModules.of(...).verify()`) uruchamiany przez `./mvnw test`
+i `./mvnw verify`.
+
 ## Testy
 Testy integracyjne (`*IT`) uruchamiają prawdziwy PostgreSQL w Testcontainers — wymagają działającego Dockera, ale nie potrzebują `docker compose up`.
 ```bash
