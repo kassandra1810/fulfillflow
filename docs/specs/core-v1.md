@@ -103,14 +103,17 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 
 ### Publiczne interfejsy modułów
 
-- **`CatalogApi`** — odczyt danych produktów potrzebnych innym modułom: istnienie produktu oraz prosty rekord z `id`, `sku` i `price` dla podanego zestawu ID. Inventory używa go do 404 przy przyjęciu i odczycie stanu; Orders — do 404 dla brakujących produktów, do kopiowania ceny i do `sku` w odpowiedzi 409.
-- **`InventoryApi`** — jedyna droga zmiany stanu magazynowego:
-  - przyjęcie towaru (produkt, ilość) → identyfikator `StockReceipt`,
-  - odczyt stanu produktu (`onHand`, `reserved`, `available`),
-  - rezerwacja pozycji zamówienia (ID zamówienia, lista produkt × ilość) → sukces albo lista braków (`productId`, `requested`, `available`),
-  - zwolnienie rezerwacji (ID zamówienia, lista produkt × ilość),
-  - odczyt historii ruchów produktu z paginacją.
-  Rezerwacja i zwolnienie uczestniczą w transakcji wywołującego (Orders), nie otwierają własnej.
+**[SPEC]** Publiczny interfejs modułu zawiera tylko operacje, których używa **inny moduł**. Metoda powstaje w tickecie, który dodaje jej pierwszego konsumenta w innym module (za endpointem), i jest testowana testami HTTP tego endpointu (seam 1). Własne endpointy modułu korzystają z serwisów w jego podpakiecie `internal`; ochronę stanu daje granica modułu (`internal` + `verify()`), nie sam interfejs.
+
+- **`CatalogApi`** — odczyt danych produktów potrzebnych innym modułom:
+  - istnienie produktu (T06) — Inventory: 404 przy przyjęciu i odczycie stanu; Orders: 404 dla brakujących produktów,
+  - prosty rekord z `id`, `sku` i `price` dla podanego zestawu ID (T08) — Orders: kopiowanie ceny i `sku` w odpowiedzi 409.
+- **`InventoryApi`** — operacje na stanie magazynowym wywoływane przez Orders:
+  - rezerwacja pozycji zamówienia (ID zamówienia, lista produkt × ilość) → sukces albo lista braków (`productId`, `requested`, `available`) (T08),
+  - zwolnienie rezerwacji (ID zamówienia, lista produkt × ilość) (T11).
+
+  Rezerwacja i zwolnienie uczestniczą w transakcji wywołującego (Orders), nie otwierają własnej: `@Transactional(propagation = MANDATORY)`, transakcję otwiera serwis Orders.
+- **Wewnętrzne w `inventory`** (bez publicznego interfejsu — nie wywołuje ich żaden inny moduł): przyjęcie towaru → `StockReceipt`, odczyt stanu (`onHand`, `reserved`, `available`), odczyt historii ruchów z paginacją. Stan i tak zmienia się wyłącznie w module `inventory`, bo inne moduły nie mają dostępu do jego `internal`.
 
 ### Model danych
 
@@ -221,6 +224,8 @@ RESERVED ──cancel──▶ CANCELLED
 2. **Spring Modulith** — test `ApplicationModules.of(...).verify()` pilnujący granic i braku cykli.
 3. **Przypięcie izolacji** — test, który pada, gdy transakcje rezerwacji/anulowania działają w izolacji innej niż `READ COMMITTED` (ADR 0001, Konsekwencje).
 
+**[SPEC]** API modułów (`CatalogApi`, `InventoryApi`) nie mają osobnego seamu: testuje je seam 1, przez endpointy, które z nich korzystają (np. `CatalogApi` — 404 w `POST /stock-receipts`; udział rezerwacji w transakcji Orders — równoczesne zamówienia z tym samym `Idempotency-Key` → jedno zamówienie i jedna rezerwacja). Test spoza HTTP (np. `@ApplicationModuleTest`) jest dozwolony tylko dla gwarancji, której nie da się zaobserwować przez HTTP, i tylko jako kolejny nazwany seam na tej liście, z uzasadnieniem — tak jak seam 3. Dziś takich wyjątków nie ma.
+
 ### Co testujemy (każda reguła z PRD 6 ma test)
 
 - Reguła 1–2: test z PRD 7 — `onHand = 5`, 100 równoczesnych zamówień po 1 szt. → dokładnie 5 × 201 (`RESERVED`), 95 × 409, `reserved = 5`, `available = 0`. Uruchamiany stabilnie wielokrotnie.
@@ -249,6 +254,7 @@ Płatności; wysyłka i realizacja zamówień; zapis i statystyki odrzuconych za
 ## Dalsze uwagi
 
 - Decyzje **[SPEC]** podjęte 2026-10-28: ścieżki `POST /stock-receipts`, `GET /products/{id}/stock`, `POST /orders/{id}/cancel`; `version` jako pole w treści `PATCH`; „ta sama treść” przy `Idempotency-Key` = zbiór linii bez względu na kolejność; seamy testów jak wyżej.
+- Decyzje **[SPEC]** podjęte 2026-11-01 (grilling po T03): API modułów testowane przez endpointy (seam 1), wyjątki tylko jako nazwane seamy; metoda API modułu powstaje z pierwszym konsumentem w innym module; przyjęcie, stan i historia są wewnętrzne w `inventory`, `InventoryApi` = rezerwacja (T08) i zwolnienie (T11) z `propagation = MANDATORY`.
 - Decyzje **[SPEC]** podjęte 2026-11-01 (review T02): reguły `sku` (trim, max 64, wielkość liter ma znaczenie), `name` max 255, równoczesny duplikat `sku` → 409, wspólny format błędów w pakiecie `web`.
 - Potwierdzone 2026-10-28: stan produktu nigdy nieprzyjętego to `0 / 0 / 0`; 409 z braku towaru zbiera wszystkie brakujące linie (doprecyzowane też w ADR 0001 i PRD 6.1); paginacja stronami jak wyżej.
 - Paginacja kursorem (keyset) dla historii ruchów to kandydat na v2, jeśli historia urośnie.

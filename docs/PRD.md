@@ -121,7 +121,7 @@ RESERVED ──cancel──▶ CANCELLED
 ### 5.5 [DECYZJA] Granice modułów (modularny monolit)
 - Jedna aplikacja, trzy moduły jako pakiety najwyższego poziomu: `catalog`, `inventory`, `orders`.
 - Każdy moduł wystawia mały publiczny interfejs (np. `CatalogApi`, `InventoryApi`) w pakiecie głównym modułu; encje, repozytoria i implementacja są w podpakietach wewnętrznych i nie są dostępne dla innych modułów.
-- Między modułami przekazujemy tylko ID i proste rekordy, nigdy encje. Stan magazynowy można zmienić wyłącznie przez `InventoryApi`, więc mechanizmu z 6.1 nie da się obejść.
+- Między modułami przekazujemy tylko ID i proste rekordy, nigdy encje. Stan magazynowy zmienia się wyłącznie w module `inventory` — inne moduły tylko przez `InventoryApi` — więc mechanizmu z 6.1 nie da się obejść. (Doprecyzowane 2026-11-01: publiczny interfejs zawiera tylko operacje używane przez inne moduły; szczegóły w `docs/specs/core-v1.md`, „Publiczne interfejsy modułów”.)
 - Kierunek zależności: `orders → catalog`, `orders → inventory`, `inventory → catalog`. Bez cykli; `catalog` nie zależy od nikogo.
 - Orders wywołuje Catalog i Inventory synchronicznie, w jednej transakcji (rezerwacja i zapis zamówienia — wszystko albo nic).
 - Granice pilnuje Spring Modulith: test `ApplicationModules.of(...).verify()` uruchamiany w `./mvnw verify`; złamanie granicy lub cykl → czerwony build.
