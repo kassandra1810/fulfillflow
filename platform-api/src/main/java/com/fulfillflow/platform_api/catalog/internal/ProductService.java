@@ -17,6 +17,9 @@ class ProductService {
 
 	@Transactional
 	Product create(String sku, String name, String description, BigDecimal price) {
+		if (repository.existsBySku(sku)) {
+			throw new DuplicateSkuException(sku);
+		}
 		Product product = new Product(UuidV7.generate(), sku, name, description, price);
 		return repository.save(product);
 	}
