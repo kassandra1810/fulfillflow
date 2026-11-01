@@ -39,7 +39,10 @@ class Product {
 		this.sku = sku;
 		this.name = name;
 		this.description = description;
-		this.price = price;
+		// Always scale 2, like NUMERIC(19,2), so POST and GET return the same price
+		// (19.90, not 19.9). Validation already rejects more than 2 decimals, so
+		// this never rounds; setScale throws if it ever would.
+		this.price = price.setScale(2);
 	}
 
 	UUID getId() {

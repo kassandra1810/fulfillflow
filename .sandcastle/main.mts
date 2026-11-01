@@ -54,7 +54,7 @@ type VerifyResult = { ok: boolean; output: string };
 
 // Runs the full build, including *IT tests, on the host where Docker exists.
 function hostVerify(worktreePath: string): VerifyResult {
-  const result = spawnSync("./mvnw", ["-B", "verify"], {
+  const result = spawnSync("./mvnw", ["-B", "clean", "verify"], {
     cwd: join(worktreePath, "platform-api"),
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,

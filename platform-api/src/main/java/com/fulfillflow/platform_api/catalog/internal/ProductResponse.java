@@ -3,7 +3,7 @@ package com.fulfillflow.platform_api.catalog.internal;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-public record ProductResponse(
+record ProductResponse(
 		UUID id,
 		String sku,
 		String name,
