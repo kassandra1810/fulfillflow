@@ -10,9 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Receiving stock and reading the current stock of a product. These operations
  * are internal to the inventory module: no other module calls them, so they are
- * not part of {@link CatalogApi}-style public interfaces (spec "Publiczne
- * interfejsy modułów"). Stock changes only here, protected by the module
- * boundary rather than an interface.
+ * not in the module's public interface ({@code InventoryApi}, added with its
+ * first consumer in T08; spec "Publiczne interfejsy modułów"). Stock changes
+ * only here, protected by the module boundary rather than an interface.
  */
 @Service
 class StockService {

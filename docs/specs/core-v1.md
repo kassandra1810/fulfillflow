@@ -144,6 +144,7 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 | `POST /orders/{id}/cancel` **[SPEC]** | 200, zamówienie w statusie `CANCELLED` (także przy ponownym anulowaniu) | 404 |
 
 - Wszystkie błędy w formacie Problem Details. 400 zawiera opis pól.
+- **[SPEC]** Ścisłe typy JSON w całym API: liczba ułamkowa w polu całkowitym (np. `"quantity": 2.5`) i liczba wysłana jako tekst (np. `"quantity": "5"`, `"price": "19.90"`) → 400; nic nie jest po cichu obcinane ani konwertowane. Ustawienia Jacksona w `application.properties`: `accept-float-as-int=false`, `allow-coercion-of-scalars=false`.
 - **[SPEC]** `sku`: białe znaki na początku i końcu są usuwane przed zapisem i sprawdzeniem duplikatu (`" SKU-1 "` to ten sam produkt co `"SKU-1"` → 409); wielkość liter ma znaczenie (`"sku-1"` ≠ `"SKU-1"`). `sku` dłuższe niż 64 znaki lub `name` dłuższa niż 255 → 400.
 - **[SPEC]** Duplikat `sku` daje 409 także przy równoczesnych żądaniach — unikalność pilnuje indeks w bazie, nie sprawdzenie przed zapisem.
 - 409 z braku towaru zawiera listę brakujących pozycji: `sku`, `requested`, `available` (migawka z chwili odrzucenia).
@@ -255,7 +256,7 @@ Płatności; wysyłka i realizacja zamówień; zapis i statystyki odrzuconych za
 ## Dalsze uwagi
 
 - Decyzje **[SPEC]** podjęte 2026-10-28: ścieżki `POST /stock-receipts`, `GET /products/{id}/stock`, `POST /orders/{id}/cancel`; `version` jako pole w treści `PATCH`; „ta sama treść” przy `Idempotency-Key` = zbiór linii bez względu na kolejność; seamy testów jak wyżej.
-- Decyzje **[SPEC]** podjęte 2026-11-01 (review T06): moduł `shared` na wspólny kod techniczny (`UuidV7`); „utwórz albo dodaj” przez `INSERT … ON CONFLICT DO UPDATE`; każda ścieżka zapisu współdzielonego wiersza ma test z prawdziwą rywalizacją.
+- Decyzje **[SPEC]** podjęte 2026-11-01 (review T06): ścisłe typy JSON w całym API; typy ruchów `RESERVATION`/`RELEASE` i odnośnik do zamówienia w `stock_movement` dochodzą w T08/T11 (nowa migracja); moduł `shared` na wspólny kod techniczny (`UuidV7`); „utwórz albo dodaj” przez `INSERT … ON CONFLICT DO UPDATE`; każda ścieżka zapisu współdzielonego wiersza ma test z prawdziwą rywalizacją.
 - Decyzje **[SPEC]** podjęte 2026-11-01 (grilling po T03): API modułów testowane przez endpointy (seam 1), wyjątki tylko jako nazwane seamy; metoda API modułu powstaje z pierwszym konsumentem w innym module; przyjęcie, stan i historia są wewnętrzne w `inventory`, `InventoryApi` = rezerwacja (T08) i zwolnienie (T11) z `propagation = MANDATORY`.
 - Decyzje **[SPEC]** podjęte 2026-11-01 (review T02): reguły `sku` (trim, max 64, wielkość liter ma znaczenie), `name` max 255, równoczesny duplikat `sku` → 409, wspólny format błędów w pakiecie `web`.
 - Potwierdzone 2026-10-28: stan produktu nigdy nieprzyjętego to `0 / 0 / 0`; 409 z braku towaru zbiera wszystkie brakujące linie (doprecyzowane też w ADR 0001 i PRD 6.1); paginacja stronami jak wyżej.

@@ -37,8 +37,8 @@ CREATE TABLE stock_receipt (
     CONSTRAINT ck_stock_receipt_quantity CHECK (quantity > 0)
 );
 
--- Append-only history. A movement points at its source: a receipt (RECEIPT) or
--- an order (RESERVATION/RELEASE); order_id stays null until orders arrive.
+-- Append-only history. A movement points at its source; in T06 that is always a
+-- receipt (RECEIPT). Orders add their types and source column when they arrive (T08).
 CREATE TABLE stock_movement (
     id               UUID        NOT NULL,
     type             VARCHAR(16) NOT NULL,
@@ -47,11 +47,10 @@ CREATE TABLE stock_movement (
     quantity         BIGINT      NOT NULL,
     created_at       TIMESTAMP WITH TIME ZONE NOT NULL,
     stock_receipt_id UUID,
-    order_id         UUID,
     CONSTRAINT pk_stock_movement PRIMARY KEY (id),
     CONSTRAINT fk_stock_movement_product FOREIGN KEY (product_id) REFERENCES product (id),
     CONSTRAINT fk_stock_movement_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouse (id),
     CONSTRAINT fk_stock_movement_receipt FOREIGN KEY (stock_receipt_id) REFERENCES stock_receipt (id),
     CONSTRAINT ck_stock_movement_quantity CHECK (quantity > 0),
-    CONSTRAINT ck_stock_movement_type CHECK (type IN ('RECEIPT', 'RESERVATION', 'RELEASE'))
+    CONSTRAINT ck_stock_movement_type CHECK (type IN ('RECEIPT'))
 );

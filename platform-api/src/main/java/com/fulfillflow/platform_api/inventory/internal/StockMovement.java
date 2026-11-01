@@ -40,14 +40,11 @@ class StockMovement {
 	@Column(name = "stock_receipt_id")
 	private UUID stockReceiptId;
 
-	@Column(name = "order_id")
-	private UUID orderId;
-
 	protected StockMovement() {
 	}
 
 	private StockMovement(UUID id, MovementType type, UUID productId, UUID warehouseId,
-			long quantity, Instant createdAt, UUID stockReceiptId, UUID orderId) {
+			long quantity, Instant createdAt, UUID stockReceiptId) {
 		this.id = id;
 		this.type = type;
 		this.productId = productId;
@@ -55,13 +52,12 @@ class StockMovement {
 		this.quantity = quantity;
 		this.createdAt = createdAt;
 		this.stockReceiptId = stockReceiptId;
-		this.orderId = orderId;
 	}
 
 	/** A {@code RECEIPT} entry caused by the given receipt. */
 	static StockMovement receipt(UUID id, UUID productId, UUID warehouseId, long quantity,
 			Instant createdAt, UUID stockReceiptId) {
 		return new StockMovement(id, MovementType.RECEIPT, productId, warehouseId,
-				quantity, createdAt, stockReceiptId, null);
+				quantity, createdAt, stockReceiptId);
 	}
 }

@@ -232,6 +232,19 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void rejectsPriceSentAsJsonStringWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-STRING-PRICE","name":"String priced","price":"19.90"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+		assertThat(productCount("SKU-STRING-PRICE")).isZero();
+	}
+
+	@Test
 	void rejectsDuplicateSkuWith409AndKeepsOnlyOne() throws Exception {
 		String payload = """
 				{"sku":"SKU-DUP","name":"Original","price":9.99}

@@ -116,6 +116,21 @@ class StockIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void rejectsQuantitySentAsJsonStringWith400() throws Exception {
+		String productId = createProduct("SKU-STRING-QTY");
+
+		mockMvc.perform(post("/api/v1/stock-receipts")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"productId":"%s","quantity":"5"}
+								""".formatted(productId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+		expectNoStock(productId);
+	}
+
+	@Test
 	void rejectsMissingProductIdWith400() throws Exception {
 		mockMvc.perform(post("/api/v1/stock-receipts")
 						.contentType(MediaType.APPLICATION_JSON)
