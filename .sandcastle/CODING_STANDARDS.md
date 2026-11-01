@@ -9,8 +9,8 @@ Sources of truth: `CLAUDE.md`, `docs/PRD.md`, `docs/adr/`. If an issue contradic
 3. Modules exchange only IDs and simple records, never entities. Stock levels change only through `InventoryApi`.
 4. Money is `BigDecimal` with exactly 2 decimal places, never `double`/`float`; reject invalid values with 400, never round silently.
 5. All entity IDs are UUIDv7; API resources are addressed by `id`, not `sku`.
-6. REST endpoints live under `/api/v1`; errors use Problem Details (RFC 9457) with the status codes from PRD 7.
-7. Database schema changes only via Flyway migrations.
+6. REST endpoints live under `/api/v1`; errors use Problem Details (RFC 9457) with the status codes from PRD 7. Error rendering lives only in the shared `web` package (`ApiExceptionHandler`); modules throw `ErrorResponseException` subclasses carrying their own status and Problem Detail, and never add their own `@RestControllerAdvice`.
+7. Database schema changes only via Flyway migrations (new `V<n>__…` file; never edit an applied one). An invariant backed by a DB constraint (unique index, `CHECK`) is enforced by the constraint: never check-then-insert (`existsBy…` then `save`) — save, flush, and translate the violation into the API error.
 8. Reservation and cancellation follow ADR 0001: conditional `UPDATE` per line, lines sorted by product ID, `READ COMMITTED` isolation (never change it), cancellation via conditional status `UPDATE` — never read-check-`save()` on an entity. `StockMovement` is append-only.
 
 ## Naming
