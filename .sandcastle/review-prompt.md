@@ -60,7 +60,7 @@ Do NOT run tests that use Testcontainers (and do not run `./mvnw verify`, which 
 
 If you find improvements to make:
 
-1. Make the changes directly on this branch
+1. Make the changes directly on this branch (do not create or switch branches, and do not push)
 2. Run the commands from the Verification section above to ensure nothing is broken
 3. Commit describing the refinements, without any AI attribution (no `Co-Authored-By:` trailer, no "Generated with Claude Code" line)
 

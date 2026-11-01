@@ -59,6 +59,7 @@ Skip any issue that already has a comment starting with `Sandcastle branch:` —
 ## Rules
 
 - Work on **one issue per iteration**. Do not attempt multiple issues in a single iteration.
+- **Stay on the current branch.** Do not create, switch or rename branches, and do not push. Sandcastle collects commits only from the branch you start on and hands them to the reviewer; a human pushes and opens the PR.
 - **Never close issues.** A human closes them after reviewing and merging the branch.
 - Do not add the `Sandcastle branch:` comment until you have committed the fix and verified tests pass.
 - Do not leave commented-out code or TODO comments in committed code.
