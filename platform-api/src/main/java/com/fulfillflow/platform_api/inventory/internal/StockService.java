@@ -1,10 +1,9 @@
 package com.fulfillflow.platform_api.inventory.internal;
 
 import com.fulfillflow.platform_api.catalog.CatalogApi;
+import com.fulfillflow.platform_api.shared.UuidV7;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +21,6 @@ class StockService {
 	private static final UUID DEFAULT_WAREHOUSE_ID =
 			UUID.fromString("11111111-1111-7111-8111-111111111111");
 
-	/** Unique index on (product_id, warehouse_id) from the V4 migration. */
-	private static final String STOCK_LEVEL_UNIQUE_INDEX = "ux_stock_level_product_warehouse";
-
 	private final CatalogApi catalog;
 	private final StockLevelRepository stockLevels;
 	private final StockReceiptRepository receipts;
@@ -41,7 +37,9 @@ class StockService {
 	@Transactional
 	StockReceipt receive(UUID productId, long quantity) {
 		requireProduct(productId);
-		addOnHand(productId, quantity);
+		// One atomic upsert: creates the stock level on the first receipt or adds
+		// to it, so concurrent receipts always sum (never check-then-insert).
+		stockLevels.addOnHand(UuidV7.generate(), productId, DEFAULT_WAREHOUSE_ID, quantity);
 
 		Instant now = Instant.now();
 		StockReceipt receipt = receipts.save(
@@ -66,33 +64,5 @@ class StockService {
 		if (!catalog.productExists(productId)) {
 			throw new UnknownProductException(productId);
 		}
-	}
-
-	private void addOnHand(UUID productId, long quantity) {
-		if (stockLevels.addOnHand(productId, DEFAULT_WAREHOUSE_ID, quantity) == 1) {
-			return;
-		}
-		// First receipt for this product: create the row. The unique index is the
-		// source of truth, so a concurrent first receipt that wins the insert just
-		// leaves us re-adding to the now-existing row (never check-then-insert).
-		try {
-			stockLevels.saveAndFlush(StockLevel.firstReceipt(
-					UuidV7.generate(), productId, DEFAULT_WAREHOUSE_ID, quantity));
-		} catch (DataIntegrityViolationException e) {
-			if (!violates(e, STOCK_LEVEL_UNIQUE_INDEX)) {
-				throw e;
-			}
-			stockLevels.addOnHand(productId, DEFAULT_WAREHOUSE_ID, quantity);
-		}
-	}
-
-	private static boolean violates(Throwable e, String constraint) {
-		for (Throwable cause = e; cause != null; cause = cause.getCause()) {
-			if (cause instanceof ConstraintViolationException violation
-					&& constraint.equalsIgnoreCase(violation.getConstraintName())) {
-				return true;
-			}
-		}
-		return false;
 	}
 }

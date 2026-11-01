@@ -31,20 +31,9 @@ class StockLevel {
 	@Column(nullable = false)
 	private long reserved;
 
+	// Read-only in Java: rows are created and changed only by atomic SQL in
+	// StockLevelRepository, never by read-modify-save on this entity.
 	protected StockLevel() {
-	}
-
-	private StockLevel(UUID id, UUID productId, UUID warehouseId, long onHand, long reserved) {
-		this.id = id;
-		this.productId = productId;
-		this.warehouseId = warehouseId;
-		this.onHand = onHand;
-		this.reserved = reserved;
-	}
-
-	/** The row created by a product's first receipt: {@code onHand} units, none reserved. */
-	static StockLevel firstReceipt(UUID id, UUID productId, UUID warehouseId, long onHand) {
-		return new StockLevel(id, productId, warehouseId, onHand, 0);
 	}
 
 	long getOnHand() {

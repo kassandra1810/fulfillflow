@@ -9,7 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -164,6 +170,55 @@ class StockIT extends AbstractPostgresIntegrationTest {
 				.andExpect(jsonPath("$.onHand").value(0))
 				.andExpect(jsonPath("$.reserved").value(0))
 				.andExpect(jsonPath("$.available").value(0));
+	}
+
+	@Test
+	void concurrentFirstReceiptsOfANewProductAreAllSummed() throws Exception {
+		String productId = createProduct("SKU-STOCK-RACE-FIRST");
+
+		List<Integer> statuses = receiveConcurrently(productId, 8);
+
+		assertThat(statuses).containsOnly(201);
+		mockMvc.perform(get("/api/v1/products/{id}/stock", productId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.onHand").value(8))
+				.andExpect(jsonPath("$.available").value(8));
+	}
+
+	@Test
+	void concurrentReceiptsOfAStockedProductAreAllSummed() throws Exception {
+		String productId = createProduct("SKU-STOCK-RACE-NEXT");
+		mockMvc.perform(receipt(productId, 5)).andExpect(status().isCreated());
+
+		List<Integer> statuses = receiveConcurrently(productId, 8);
+
+		assertThat(statuses).containsOnly(201);
+		mockMvc.perform(get("/api/v1/products/{id}/stock", productId))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.onHand").value(13));
+	}
+
+	/** Sends {@code requests} receipts of quantity 1 at the same moment. */
+	private List<Integer> receiveConcurrently(String productId, int requests) throws Exception {
+		CountDownLatch start = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(requests);
+		try {
+			List<Future<Integer>> futures = new ArrayList<>();
+			for (int i = 0; i < requests; i++) {
+				futures.add(executor.submit(() -> {
+					start.await();
+					return mockMvc.perform(receipt(productId, 1)).andReturn().getResponse().getStatus();
+				}));
+			}
+			start.countDown();
+			List<Integer> statuses = new ArrayList<>();
+			for (Future<Integer> future : futures) {
+				statuses.add(future.get());
+			}
+			return statuses;
+		} finally {
+			executor.shutdownNow();
+		}
 	}
 
 	private void expectNoStock(String productId) throws Exception {

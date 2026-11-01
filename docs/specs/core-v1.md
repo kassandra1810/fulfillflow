@@ -98,6 +98,7 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 - Każdy moduł wystawia mały publiczny interfejs w pakiecie głównym modułu; encje, repozytoria i implementacja są w podpakietach wewnętrznych. Między modułami przechodzą tylko ID i proste rekordy, nigdy encje.
 - Kierunek zależności: `orders → catalog`, `orders → inventory`, `inventory → catalog`. `catalog` nie zależy od nikogo. Brak cykli.
 - Granice pilnuje Spring Modulith (`ApplicationModules.of(...).verify()` w `./mvnw verify`).
+- **[SPEC]** Wspólny kod techniczny bez logiki domenowej, używany przez kilka modułów, jest w module `shared` (np. generator `UuidV7`, PRD 5.4); `shared` nie zależy od żadnego modułu. Nie kopiujemy takiego kodu między modułami.
 - **[SPEC]** Wspólny format błędów (Problem Details: 400 walidacji z mapą `errors`, nieparsowalne body) jest w jednym miejscu: pakiet `web` (`ApiExceptionHandler`). Moduły zgłaszają błędy domenowe (404, 409, …) wyjątkami `ErrorResponseException`, które niosą własny status i Problem Detail, więc `web` nie zależy od żadnego modułu.
 - Nowe zależności w stosie (PRD 7): PostgreSQL, Spring Data JPA / Hibernate, Flyway, Spring Modulith, generator OpenAPI, Testcontainers.
 
@@ -254,6 +255,7 @@ Płatności; wysyłka i realizacja zamówień; zapis i statystyki odrzuconych za
 ## Dalsze uwagi
 
 - Decyzje **[SPEC]** podjęte 2026-10-28: ścieżki `POST /stock-receipts`, `GET /products/{id}/stock`, `POST /orders/{id}/cancel`; `version` jako pole w treści `PATCH`; „ta sama treść” przy `Idempotency-Key` = zbiór linii bez względu na kolejność; seamy testów jak wyżej.
+- Decyzje **[SPEC]** podjęte 2026-11-01 (review T06): moduł `shared` na wspólny kod techniczny (`UuidV7`); „utwórz albo dodaj” przez `INSERT … ON CONFLICT DO UPDATE`; każda ścieżka zapisu współdzielonego wiersza ma test z prawdziwą rywalizacją.
 - Decyzje **[SPEC]** podjęte 2026-11-01 (grilling po T03): API modułów testowane przez endpointy (seam 1), wyjątki tylko jako nazwane seamy; metoda API modułu powstaje z pierwszym konsumentem w innym module; przyjęcie, stan i historia są wewnętrzne w `inventory`, `InventoryApi` = rezerwacja (T08) i zwolnienie (T11) z `propagation = MANDATORY`.
 - Decyzje **[SPEC]** podjęte 2026-11-01 (review T02): reguły `sku` (trim, max 64, wielkość liter ma znaczenie), `name` max 255, równoczesny duplikat `sku` → 409, wspólny format błędów w pakiecie `web`.
 - Potwierdzone 2026-10-28: stan produktu nigdy nieprzyjętego to `0 / 0 / 0`; 409 z braku towaru zbiera wszystkie brakujące linie (doprecyzowane też w ADR 0001 i PRD 6.1); paginacja stronami jak wyżej.

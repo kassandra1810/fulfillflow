@@ -1,4 +1,4 @@
-package com.fulfillflow.platform_api.catalog.internal;
+package com.fulfillflow.platform_api.shared;
 
 import java.security.SecureRandom;
 import java.util.UUID;
@@ -8,7 +8,7 @@ import java.util.UUID;
  * followed by random bits, so the values are time-ordered and index-friendly.
  * IDs are assigned in the application before the entity is persisted (PRD 5.4).
  */
-final class UuidV7 {
+public final class UuidV7 {
 
 	// IDs must be unpredictable (PRD 5.4, RFC 9562 §6.9), so the random bits come
 	// from a CSPRNG; SecureRandom is thread-safe.
@@ -17,7 +17,7 @@ final class UuidV7 {
 	private UuidV7() {
 	}
 
-	static UUID generate() {
+	public static UUID generate() {
 		long timestamp = System.currentTimeMillis();
 
 		long mostSignificantBits = (timestamp << 16)  // 48-bit timestamp in the high bits

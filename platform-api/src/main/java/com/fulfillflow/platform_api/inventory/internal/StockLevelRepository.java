@@ -12,16 +12,23 @@ interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
 	Optional<StockLevel> findByProductIdAndWarehouseId(UUID productId, UUID warehouseId);
 
 	/**
-	 * Adds to {@code on_hand} atomically in the database, so concurrent receipts
-	 * of the same product sum instead of losing an update (no read-modify-save).
+	 * Adds to {@code on_hand} in one atomic statement: creates the stock level on
+	 * the first receipt, otherwise adds to the existing row. Concurrent receipts
+	 * — including concurrent first receipts of a new product — all sum, with no
+	 * read-modify-save and no constraint violation to recover from (in
+	 * PostgreSQL a failed INSERT aborts the whole transaction).
 	 *
-	 * @return the number of rows changed: 1 if the stock level exists, 0 if the
-	 *         product has never been received (no row yet).
+	 * @param newId the id used only if this call creates the row
 	 */
 	@Modifying
-	@Query("update StockLevel s set s.onHand = s.onHand + :quantity "
-			+ "where s.productId = :productId and s.warehouseId = :warehouseId")
-	int addOnHand(@Param("productId") UUID productId,
+	@Query(nativeQuery = true, value = """
+			INSERT INTO stock_level (id, product_id, warehouse_id, on_hand, reserved)
+			VALUES (:newId, :productId, :warehouseId, :quantity, 0)
+			ON CONFLICT (product_id, warehouse_id)
+			DO UPDATE SET on_hand = stock_level.on_hand + EXCLUDED.on_hand
+			""")
+	void addOnHand(@Param("newId") UUID newId,
+			@Param("productId") UUID productId,
 			@Param("warehouseId") UUID warehouseId,
 			@Param("quantity") long quantity);
 }
