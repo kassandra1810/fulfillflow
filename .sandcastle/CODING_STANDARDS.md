@@ -20,8 +20,8 @@ Sources of truth: `CLAUDE.md`, `docs/PRD.md`, `docs/adr/`. If an issue contradic
 ## Testing
 
 10. Every behaviour change comes with a test; every business rule from PRD 6 must stay covered.
-11. Unit tests: `*Test.java`, no Docker or database, run by `./mvnw test` (Surefire).
-12. Tests that need PostgreSQL/Testcontainers: `*IT.java`, real PostgreSQL (no H2), run only in `./mvnw verify` (Failsafe).
+11. Behaviour (validation, status codes, persistence, business rules) is tested only through the HTTP API `/api/v1` on the full application with real PostgreSQL in Testcontainers — the single behaviour seam from `docs/specs/core-v1.md` (Seamy). These tests are `*IT.java` and run in `./mvnw verify` (Failsafe). No H2, no `@WebMvcTest`/`@DataJpaTest` slices with mocked collaborators that duplicate `*IT` cases.
+12. `*Test.java` (Surefire, `./mvnw test`) only for pure logic without Spring or a database (e.g. an ID generator). Do not write them just to have something runnable without Docker.
 
 ## Scope
 
