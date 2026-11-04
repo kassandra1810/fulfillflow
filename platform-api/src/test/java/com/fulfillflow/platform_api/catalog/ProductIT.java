@@ -467,6 +467,22 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void listRejectsPageWhoseOffsetDoesNotFitTheDatabaseWith400() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("page", "30000000").param("size", "100"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.page").exists());
+	}
+
+	@Test
+	void getRejectsMalformedIdWith400() throws Exception {
+		mockMvc.perform(get("/api/v1/products/not-a-uuid"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.id").exists());
+	}
+
+	@Test
 	void listBySkuReturnsSingleElementPageForExistingSku() throws Exception {
 		String sku = "SKU-FILTER-HIT-" + UUID.randomUUID();
 		createProduct(sku);

@@ -158,7 +158,7 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 Dotyczy `GET /products` i `GET /products/{id}/stock-movements`.
 
 - Paginacja stronami: `?page=0&size=20`; `page` od 0, domyślnie `size = 20`, maksymalnie `100`.
-- `page < 0`, `size < 1` lub `size > 100` → 400 (bez cichego przycinania). Nieliczbowe `page`/`size` (np. `page=abc`) → 400. Każde takie 400 to Problem Details z mapą `errors` wskazującą parametr (np. `{"page": "..."}`), tak jak 400 walidacji treści.
+- `page < 0`, `size < 1` lub `size > 100` → 400 (bez cichego przycinania). Nieliczbowe `page`/`size` (np. `page=abc`) → 400. `page` większe niż `Integer.MAX_VALUE / 100` (przesunięcie wierszy nie mieści się w zapytaniu) → 400, nie 500. Każde takie 400 to Problem Details z mapą `errors` wskazującą parametr (np. `{"page": "..."}`), tak jak 400 walidacji treści.
 - Klient nie wybiera sortowania. Kolejność jest stała: produkty po `sku` rosnąco według collation bazy (porządek językowy, np. `a, A, b, B`, nie bajtowy); ruchy magazynowe od najnowszych (czas malejąco, przy remisie `id` malejąco).
 - Kształt odpowiedzi (stabilny format DTO ze Spring Data, nie serializacja `Page`/`PageImpl`):
 
