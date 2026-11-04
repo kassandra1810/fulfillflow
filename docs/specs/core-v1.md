@@ -158,8 +158,8 @@ Równoczesne zamówienia nigdy nie rezerwują więcej, niż jest dostępne. Gwar
 Dotyczy `GET /products` i `GET /products/{id}/stock-movements`.
 
 - Paginacja stronami: `?page=0&size=20`; `page` od 0, domyślnie `size = 20`, maksymalnie `100`.
-- `page < 0`, `size < 1` lub `size > 100` → 400 (bez cichego przycinania).
-- Klient nie wybiera sortowania. Kolejność jest stała: produkty po `sku` rosnąco; ruchy magazynowe od najnowszych (czas malejąco, przy remisie `id` malejąco).
+- `page < 0`, `size < 1` lub `size > 100` → 400 (bez cichego przycinania). Nieliczbowe `page`/`size` (np. `page=abc`) → 400. `page` większe niż `Integer.MAX_VALUE / 100` (przesunięcie wierszy nie mieści się w zapytaniu) → 400, nie 500. Każde takie 400 to Problem Details z mapą `errors` wskazującą parametr (np. `{"page": "..."}`), tak jak 400 walidacji treści.
+- Klient nie wybiera sortowania. Kolejność jest stała: produkty po `sku` rosnąco według collation bazy (porządek językowy, np. `a, A, b, B`, nie bajtowy); ruchy magazynowe od najnowszych (czas malejąco, przy remisie `id` malejąco).
 - Kształt odpowiedzi (stabilny format DTO ze Spring Data, nie serializacja `Page`/`PageImpl`):
 
   ```json
@@ -169,7 +169,7 @@ Dotyczy `GET /products` i `GET /products/{id}/stock-movements`.
   }
   ```
 
-- `GET /products?sku=…` zwraca tę samą stronę z 0 albo 1 elementem, nigdy 404.
+- `GET /products?sku=…` zwraca tę samą stronę z 0 albo 1 elementem, nigdy 404. Filtr stosuje tę samą regułę co zapis: białe znaki na początku i końcu są usuwane (`?sku=%20SKU-1%20` znajduje `SKU-1`), wielkość liter ma znaczenie. Puste `?sku=` to filtr bez wyniku → pusta strona (nie pełna lista).
 
 ### Edycja produktu (PRD 5.1)
 
