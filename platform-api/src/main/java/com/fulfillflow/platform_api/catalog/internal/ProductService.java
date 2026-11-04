@@ -7,7 +7,9 @@ import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,15 +46,16 @@ class ProductService {
 	}
 
 	/**
-	 * One page of products in the fixed order set by {@code pageable} (always by
-	 * sku ascending). With a {@code sku} the page holds the single matching
-	 * product or none; the client never gets a 404 for a missing sku.
+	 * One page of products, always ordered by sku ascending. With a {@code sku}
+	 * (surrounding whitespace stripped, as on create) the page holds the single
+	 * matching product or none; the client never gets a 404 for a missing sku.
 	 */
 	@Transactional(readOnly = true)
-	Page<Product> list(String sku, Pageable pageable) {
+	Page<Product> list(String sku, int page, int size) {
+		Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "sku"));
 		return sku == null
 				? repository.findAll(pageable)
-				: repository.findBySku(sku, pageable);
+				: repository.findBySku(sku.strip(), pageable);
 	}
 
 	private static boolean violates(Throwable e, String constraint) {

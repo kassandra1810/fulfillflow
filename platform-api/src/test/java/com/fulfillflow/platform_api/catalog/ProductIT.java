@@ -420,7 +420,7 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 
 		List<String> firstPage = skusOnPage(0, 10);
 		List<String> secondPage = skusOnPage(1, 10);
-		List<String> twentyInOne = skusOnPage(0, 20);
+		List<String> firstTwentyInOneRequest = skusOnPage(0, 20);
 
 		// Pagination is a stable window over one total order: page 0 then page 1
 		// equals the first 20 in a single request.
@@ -428,28 +428,42 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 		combined.addAll(secondPage);
 		assertThat(firstPage).hasSize(10);
 		assertThat(secondPage).hasSize(10);
-		assertThat(combined).isEqualTo(twentyInOne);
+		assertThat(combined).isEqualTo(firstTwentyInOneRequest);
 
 		// Order is by sku ascending: the smallest 20 SKUs are this family's 01..20.
-		assertThat(twentyInOne).isEqualTo(created.subList(0, 20));
+		assertThat(firstTwentyInOneRequest).isEqualTo(created.subList(0, 20));
 	}
 
 	@Test
 	void listRejectsNegativePageWith400() throws Exception {
 		mockMvc.perform(get("/api/v1/products").param("page", "-1"))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.page").exists());
 	}
 
 	@Test
 	void listRejectsSizeBelowOneWith400() throws Exception {
 		mockMvc.perform(get("/api/v1/products").param("size", "0"))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.size").exists());
 	}
 
 	@Test
 	void listRejectsSizeAbove100With400() throws Exception {
 		mockMvc.perform(get("/api/v1/products").param("size", "101"))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.size").exists());
+	}
+
+	@Test
+	void listRejectsNonNumericPageWith400() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("page", "abc"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.page").exists());
 	}
 
 	@Test
@@ -467,6 +481,27 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	@Test
 	void listBySkuReturnsEmptyPageNeverNotFoundForUnknownSku() throws Exception {
 		mockMvc.perform(get("/api/v1/products").param("sku", "SKU-NO-SUCH-" + UUID.randomUUID()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(0))
+				.andExpect(jsonPath("$.page.totalElements").value(0));
+	}
+
+	@Test
+	void listBySkuStripsSurroundingWhitespaceLikeCreate() throws Exception {
+		String sku = "SKU-FILTER-STRIP-" + UUID.randomUUID();
+		createProduct(sku);
+
+		mockMvc.perform(get("/api/v1/products").param("sku", "  " + sku + " "))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(1))
+				.andExpect(jsonPath("$.content[0].sku").value(sku));
+	}
+
+	@Test
+	void listByBlankSkuReturnsEmptyPage() throws Exception {
+		createProduct("SKU-FILTER-BLANK-" + UUID.randomUUID());
+
+		mockMvc.perform(get("/api/v1/products").param("sku", ""))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content.length()").value(0))
 				.andExpect(jsonPath("$.page.totalElements").value(0));
