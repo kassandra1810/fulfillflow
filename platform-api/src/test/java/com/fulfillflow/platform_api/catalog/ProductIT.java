@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -521,6 +522,314 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content.length()").value(0))
 				.andExpect(jsonPath("$.page.totalElements").value(0));
+	}
+
+	@Test
+	void patchUpdatesNameOnlyLeavesOtherFieldsAndBumpsVersion() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NAME", "Old name", "Old desc", "7.50");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New name","version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("New name"))
+				.andExpect(jsonPath("$.description").value("Old desc"))
+				.andExpect(jsonPath("$.price").value(7.50))
+				.andExpect(jsonPath("$.version").value(1));
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("New name"))
+				.andExpect(jsonPath("$.description").value("Old desc"))
+				.andExpect(jsonPath("$.price").value(7.50))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	@Test
+	void patchUpdatesDescriptionOnly() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-DESC", "Name", "Old desc", "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"description":"New desc","version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Name"))
+				.andExpect(jsonPath("$.description").value("New desc"))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	@Test
+	void patchUpdatesPriceOnlyNormalizedToScale2() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-PRICE", "Name", null, "1.00");
+
+		MvcResult patched = mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"price":19.9,"version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.version").value(1))
+				.andReturn();
+
+		// Same scale-2 normalization as create: 19.90, never 19.9.
+		assertThat(patched.getResponse().getContentAsString()).contains("\"price\":19.90");
+	}
+
+	@Test
+	void patchClearsDescriptionWithExplicitNull() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-CLEAR", "Name", "Has a description", "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"description":null,"version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.description").value(nullValue()))
+				.andExpect(jsonPath("$.version").value(1));
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.description").value(nullValue()));
+	}
+
+	@Test
+	void patchWithNoEffectiveChangeKeepsVersion() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NOOP", "Name", "Desc", "1.00");
+
+		// Only the version, no field to change: nothing is dirty, so the version
+		// must stay put (no forced increment) — no concurrent change is lost.
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.version").value(0));
+
+		// Re-sending the same values is likewise a no-op: still version 0.
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Name","description":"Desc","price":1.00,"version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void patchWithSkuInBodyReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-SKU", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-OTHER","name":"New","version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.sku").exists());
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.sku").value("SKU-PATCH-SKU"))
+				.andExpect(jsonPath("$.name").value("Name"))
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void patchWithoutVersionReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NOVER", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.version").exists());
+	}
+
+	@Test
+	void patchWithNullNameReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NULLNAME", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":null,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+	}
+
+	@Test
+	void patchWithBlankNameReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-BLANKNAME", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"   ","version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+	}
+
+	@Test
+	void patchWithNameLongerThan255Returns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-LONGNAME", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"%s","version":0}
+								""".formatted("N".repeat(256))))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+	}
+
+	@Test
+	void patchWithNullPriceReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NULLPRICE", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"price":null,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.price").exists());
+	}
+
+	@Test
+	void patchWithNonPositivePriceReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-ZEROPRICE", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"price":0,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.price").exists());
+	}
+
+	@Test
+	void patchWithPriceOverTwoDecimalsReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-3DP", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"price":1.999,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.price").exists());
+	}
+
+	@Test
+	void patchWithStaleVersionReturns409() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-STALE", "Name", null, "1.00");
+
+		// First edit on version 0 succeeds and bumps to 1.
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"First","version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.version").value(1));
+
+		// Second edit still on version 0 is a lost update → 409.
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"Second","version":0}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.detail").exists());
+
+		// The losing edit changed nothing.
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.name").value("First"))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	@Test
+	void patchUnknownProductReturns404() throws Exception {
+		UUID unknown = UUID.fromString("018f8e2a-0000-7000-8000-00000000aaaa");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", unknown)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New","version":0}
+								"""))
+				.andExpect(status().isNotFound())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.detail").exists());
+	}
+
+	@Test
+	void concurrentPatchesWithSameVersionGiveOne200AndRest409AndBumpVersionOnce() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-RACE", "Original", null, "1.00");
+
+		int requests = 8;
+		CountDownLatch start = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(requests);
+		try {
+			List<Future<Integer>> statuses = new ArrayList<>();
+			for (int i = 0; i < requests; i++) {
+				int n = i;
+				statuses.add(executor.submit(() -> {
+					start.await();
+					return mockMvc.perform(patch("/api/v1/products/{id}", id)
+									.contentType(MediaType.APPLICATION_JSON)
+									.content("""
+											{"name":"Updated-%d","version":0}
+											""".formatted(n)))
+							.andReturn().getResponse().getStatus();
+				}));
+			}
+			start.countDown();
+
+			List<Integer> results = new ArrayList<>();
+			for (Future<Integer> status : statuses) {
+				results.add(status.get());
+			}
+			assertThat(results).containsOnly(200, 409);
+			assertThat(results).filteredOn(code -> code == 200).hasSize(1);
+		} finally {
+			executor.shutdownNow();
+		}
+
+		// Exactly one edit won, so the version is the old one plus one.
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	private String createDetailedProduct(String sku, String name, String description, String price)
+			throws Exception {
+		String descriptionJson = description == null ? "null" : "\"" + description + "\"";
+		MvcResult created = mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"%s","name":"%s","description":%s,"price":%s}
+								""".formatted(sku, name, descriptionJson, price)))
+				.andExpect(status().isCreated())
+				.andReturn();
+		return readId(created);
 	}
 
 	private List<String> skusOnPage(int page, int size) throws Exception {

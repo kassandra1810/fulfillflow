@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,6 +59,20 @@ public class ProductController {
 	@GetMapping("/{id}")
 	ResponseEntity<ProductResponse> get(@PathVariable UUID id) {
 		Product product = service.findById(id).orElseThrow(() -> new ProductNotFoundException(id));
+		return ResponseEntity.ok(ProductResponse.from(product));
+	}
+
+	/**
+	 * Partially updates a product under optimistic locking. Only the fields sent
+	 * change; {@code "description": null} clears the description, an omitted field
+	 * is left alone. {@code version} is required; a stale one is a 409. Validation
+	 * is not {@code @Valid} here because PATCH needs to tell an absent field from an
+	 * explicit {@code null} — {@link UpdateProductRequest} carries both and
+	 * validates itself in the service.
+	 */
+	@PatchMapping("/{id}")
+	ResponseEntity<ProductResponse> update(@PathVariable UUID id, @RequestBody UpdateProductRequest request) {
+		Product product = service.update(id, request);
 		return ResponseEntity.ok(ProductResponse.from(product));
 	}
 }
