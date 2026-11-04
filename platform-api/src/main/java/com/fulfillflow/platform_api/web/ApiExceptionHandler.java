@@ -67,10 +67,6 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	private static ProblemDetail validationFailed(Map<String, String> errors) {
-		ProblemDetail body = ProblemDetail.forStatusAndDetail(
-				HttpStatus.BAD_REQUEST, "Request validation failed");
-		body.setTitle("Validation failed");
-		body.setProperty("errors", errors);
-		return body;
+		return ValidationFailedException.body(errors);
 	}
 }

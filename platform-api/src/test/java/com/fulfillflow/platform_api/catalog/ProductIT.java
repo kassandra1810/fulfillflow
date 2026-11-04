@@ -782,6 +782,93 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void patchWithNullSkuReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NULLSKU", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":null,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.sku").exists());
+	}
+
+	@Test
+	void patchWithNullVersionReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NULLVER", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New","version":null}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.version").exists());
+	}
+
+	@Test
+	void patchWithUnparsableBodyReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-UNPARSABLE", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"price":"abc","version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+	}
+
+	@Test
+	void patchValidationFailsBeforeUnknownProductIsReported() throws Exception {
+		UUID unknown = UUID.fromString("018f8e2a-0000-7000-8000-00000000bbbb");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", unknown)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.version").exists());
+	}
+
+	@Test
+	void patchUnknownProductIsReportedBeforeVersionConflict() throws Exception {
+		UUID unknown = UUID.fromString("018f8e2a-0000-7000-8000-00000000cccc");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", unknown)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New","version":42}
+								"""))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void patchValidationMessagesMatchCreate() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-MESSAGES", "Name", null, "1.00");
+		String createErrors = mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-PATCH-MESSAGES-2","name":null,"price":null}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andReturn().getResponse().getContentAsString();
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":null,"price":null,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.name").value(JsonPath.<String>read(createErrors, "$.errors.name")))
+				.andExpect(jsonPath("$.errors.price").value(JsonPath.<String>read(createErrors, "$.errors.price")));
+	}
+
+	@Test
 	void concurrentPatchesWithSameVersionGiveOne200AndRest409AndBumpVersionOnce() throws Exception {
 		String id = createDetailedProduct("SKU-PATCH-RACE", "Original", null, "1.00");
 

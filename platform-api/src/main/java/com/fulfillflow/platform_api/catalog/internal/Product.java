@@ -44,7 +44,7 @@ class Product {
 
 	/**
 	 * Changes the name. State changes go through this method, not a public setter,
-	 * so the entity stays in control of its own invariants (CODING_STANDARDS 3).
+	 * so the entity stays in control of its own state.
 	 */
 	void changeName(String name) {
 		this.name = name;

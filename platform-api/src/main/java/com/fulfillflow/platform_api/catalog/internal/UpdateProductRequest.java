@@ -1,11 +1,9 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fulfillflow.platform_api.web.ValidationFailedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,10 +16,11 @@ import java.util.Map;
  * {@code null} but never for an absent field, so the {@code *Present} flags carry
  * that distinction.
  *
- * <p>Value constraints ({@code @Size}, {@code @Positive}, {@code @Digits}) match
- * {@link CreateProductRequest} and run through the shared {@link Validator}; the
- * PATCH-specific presence, {@code null} and {@code sku}-immutability rules are
- * checked in {@link #validate}. All failures land in one {@code errors} map.
+ * <p>A sent {@code name} or {@code price} is checked against the constraints
+ * declared once on {@link CreateProductRequest} (via
+ * {@link Validator#validateValue}), so both endpoints share one set of rules and
+ * messages. Only the PATCH-specific rules ({@code sku} immutable, {@code version}
+ * required) live here. All failures land in one {@code errors} map.
  */
 class UpdateProductRequest {
 
@@ -29,7 +28,6 @@ class UpdateProductRequest {
 
 	private boolean namePresent;
 
-	@Size(max = 255)
 	private String name;
 
 	private boolean descriptionPresent;
@@ -38,8 +36,6 @@ class UpdateProductRequest {
 
 	private boolean pricePresent;
 
-	@Positive
-	@Digits(integer = 17, fraction = 2)
 	private BigDecimal price;
 
 	private Long version;
@@ -91,17 +87,21 @@ class UpdateProductRequest {
 		if (version == null) {
 			errors.put("version", "must not be null");
 		}
-		if (namePresent && (name == null || name.isBlank())) {
-			errors.put("name", "must not be blank");
+		if (namePresent) {
+			rejectInvalid(validator, "name", name, errors);
 		}
-		if (pricePresent && price == null) {
-			errors.put("price", "must not be null");
-		}
-		for (ConstraintViolation<UpdateProductRequest> violation : validator.validate(this)) {
-			errors.putIfAbsent(violation.getPropertyPath().toString(), violation.getMessage());
+		if (pricePresent) {
+			rejectInvalid(validator, "price", price, errors);
 		}
 		if (!errors.isEmpty()) {
-			throw new ProductValidationException(errors);
+			throw new ValidationFailedException(errors);
+		}
+	}
+
+	private static void rejectInvalid(Validator validator, String field, Object value, Map<String, String> errors) {
+		for (ConstraintViolation<CreateProductRequest> violation
+				: validator.validateValue(CreateProductRequest.class, field, value)) {
+			errors.putIfAbsent(field, violation.getMessage());
 		}
 	}
 
