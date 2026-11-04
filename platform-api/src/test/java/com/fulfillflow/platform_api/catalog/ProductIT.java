@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
+import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -389,6 +390,104 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(jsonPath("$.errors.name").exists());
 
 		assertThat(productCount("SKU-NO-NAME")).isZero();
+	}
+
+	@Test
+	void listReturnsDefaultPageNumberAndSizeWithMetadata() throws Exception {
+		createProduct("SKU-LIST-DEFAULT");
+
+		mockMvc.perform(get("/api/v1/products"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content").isArray())
+				.andExpect(jsonPath("$.page.number").value(0))
+				.andExpect(jsonPath("$.page.size").value(20))
+				.andExpect(jsonPath("$.page.totalElements").isNumber())
+				.andExpect(jsonPath("$.page.totalPages").isNumber());
+	}
+
+	@Test
+	void listKeepsSkuAscendingOrderAcrossPages() throws Exception {
+		// A family sharing a unique, smallest-sorting prefix so these products sort
+		// first (before every SKU-/sku- product) and their only differing part is a
+		// numeric suffix, giving an unambiguous order in any collation.
+		String prefix = "0PG-" + UUID.randomUUID() + "-";
+		List<String> created = new ArrayList<>();
+		for (int i = 1; i <= 25; i++) {
+			String sku = prefix + String.format("%02d", i);
+			createProduct(sku);
+			created.add(sku);
+		}
+
+		List<String> firstPage = skusOnPage(0, 10);
+		List<String> secondPage = skusOnPage(1, 10);
+		List<String> twentyInOne = skusOnPage(0, 20);
+
+		// Pagination is a stable window over one total order: page 0 then page 1
+		// equals the first 20 in a single request.
+		List<String> combined = new ArrayList<>(firstPage);
+		combined.addAll(secondPage);
+		assertThat(firstPage).hasSize(10);
+		assertThat(secondPage).hasSize(10);
+		assertThat(combined).isEqualTo(twentyInOne);
+
+		// Order is by sku ascending: the smallest 20 SKUs are this family's 01..20.
+		assertThat(twentyInOne).isEqualTo(created.subList(0, 20));
+	}
+
+	@Test
+	void listRejectsNegativePageWith400() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("page", "-1"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listRejectsSizeBelowOneWith400() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("size", "0"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listRejectsSizeAbove100With400() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("size", "101"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listBySkuReturnsSingleElementPageForExistingSku() throws Exception {
+		String sku = "SKU-FILTER-HIT-" + UUID.randomUUID();
+		createProduct(sku);
+
+		mockMvc.perform(get("/api/v1/products").param("sku", sku))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(1))
+				.andExpect(jsonPath("$.content[0].sku").value(sku))
+				.andExpect(jsonPath("$.page.totalElements").value(1));
+	}
+
+	@Test
+	void listBySkuReturnsEmptyPageNeverNotFoundForUnknownSku() throws Exception {
+		mockMvc.perform(get("/api/v1/products").param("sku", "SKU-NO-SUCH-" + UUID.randomUUID()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(0))
+				.andExpect(jsonPath("$.page.totalElements").value(0));
+	}
+
+	private List<String> skusOnPage(int page, int size) throws Exception {
+		String json = mockMvc.perform(get("/api/v1/products")
+						.param("page", String.valueOf(page))
+						.param("size", String.valueOf(size)))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(json, "$.content[*].sku");
+	}
+
+	private void createProduct(String sku) throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"%s","name":"Listed","price":1.00}
+								""".formatted(sku)))
+				.andExpect(status().isCreated());
 	}
 
 	private long totalProducts() {
