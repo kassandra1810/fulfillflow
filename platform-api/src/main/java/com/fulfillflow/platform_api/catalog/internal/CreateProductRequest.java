@@ -14,10 +14,8 @@ public record CreateProductRequest(
 		@NotNull @Positive @Digits(integer = 17, fraction = 2) BigDecimal price) {
 
 	public CreateProductRequest {
-		// Leading/trailing whitespace is part of neither the sku nor the name (spec),
-		// so "SKU-1 " is the same product as "SKU-1" and "  Widget  " stores as
-		// "Widget". Stripping before @Size/@NotBlank run checks the trimmed value.
-		// Case is significant. description is free text and is not trimmed.
+		// sku and name are stored trimmed (see ProductText), so "SKU-1 " is the same
+		// product as "SKU-1" and "  Widget  " stores as "Widget". Case is significant.
 		sku = ProductText.strip(sku);
 		name = ProductText.strip(name);
 	}

@@ -7,11 +7,11 @@ final class ProductText {
 	}
 
 	/**
-	 * Strips surrounding whitespace, preserving {@code null}. Applied to {@code sku}
-	 * and {@code name} in both POST and PATCH so the stored value never carries
-	 * leading/trailing whitespace and {@code @Size}/{@code @NotBlank} are checked
-	 * against the trimmed value (spec: core-v1). {@code description} is free text and
-	 * is not trimmed.
+	 * Strips surrounding whitespace, preserving {@code null}, so a stored value never
+	 * carries leading/trailing whitespace and {@code @Size}/{@code @NotBlank} are
+	 * checked against the trimmed value (spec: core-v1). Applied to {@code sku} (POST;
+	 * immutable in PATCH) and {@code name} (POST and PATCH). {@code description} is
+	 * free text and is not trimmed.
 	 */
 	static String strip(String value) {
 		return value == null ? null : value.strip();
