@@ -906,6 +906,20 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void patchWithVersionAsStringReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-VERSTR", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New","version":"0"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.version").exists());
+	}
+
+	@Test
 	void patchValidationFailsBeforeUnknownProductIsReported() throws Exception {
 		UUID unknown = UUID.fromString("018f8e2a-0000-7000-8000-00000000bbbb");
 

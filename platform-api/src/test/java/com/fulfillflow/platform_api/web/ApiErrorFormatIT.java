@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fulfillflow.platform_api.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -42,14 +44,27 @@ class ApiErrorFormatIT extends AbstractPostgresIntegrationTest {
 				.andExpect(jsonPath("$.errors").doesNotExist());
 	}
 
-	@Test
-	void nonObjectJsonRootIs400ProblemDetailWithoutErrors() throws Exception {
+	@ParameterizedTest
+	@ValueSource(strings = {"[]", "\"str\"", "null", ""})
+	void bodyWithNoFieldAtFaultIs400ProblemDetailWithoutErrors(String body) throws Exception {
 		mockMvc.perform(post("/api/v1/products")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("[]"))
+						.content(body))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.errors").doesNotExist());
+	}
+
+	@Test
+	void numberOutOfRangeIs400PointingAtTheField() throws Exception {
+		mockMvc.perform(post("/api/v1/stock-receipts")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"productId":"018f8e2a-0000-7000-8000-00000000dddd","quantity":99999999999999999999}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+				.andExpect(jsonPath("$.errors.quantity").exists());
 	}
 }

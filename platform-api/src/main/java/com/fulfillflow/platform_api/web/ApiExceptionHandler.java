@@ -16,6 +16,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.exc.InputCoercionException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
@@ -62,7 +63,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	/**
 	 * A body whose JSON is well-formed but has a field of the wrong type (a number
 	 * or boolean where a {@code String} is expected, a string where a number is
-	 * expected, a fractional value for an integer field, ...) becomes a 400 with
+	 * expected, a fractional value for an integer field, a number out of the
+	 * field's range, ...) becomes a 400 with
 	 * {@code errors.<field>}, like every other validation 400 — not a bare "could
 	 * not read" message. Syntactically broken JSON, an empty body and a JSON root
 	 * that is not an object keep the default 400 Problem Details without an
@@ -74,8 +76,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			HttpHeaders headers,
 			HttpStatusCode status,
 			WebRequest request) {
-		if (ex.getCause() instanceof MismatchedInputException mismatch) {
-			String field = fieldPath(mismatch);
+		if (ex.getCause() instanceof JacksonException cause
+				&& (cause instanceof MismatchedInputException || cause instanceof InputCoercionException)) {
+			String field = fieldPath(cause);
 			if (field != null) {
 				Map<String, String> errors = Map.of(field, "has an invalid type");
 				return handleExceptionInternal(
@@ -86,22 +89,23 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	/**
-	 * The dotted path of the field that failed to bind (e.g. {@code price}, or
-	 * {@code outer.inner} when nested), or {@code null} when the failure points at
-	 * no field (a non-object JSON root, an empty body). Only property names
-	 * contribute; array indices are skipped.
+	 * The path of the field that failed to bind, named like Bean Validation names
+	 * it ({@code price}, {@code outer.inner}, {@code lines[0].quantity}) so a type
+	 * error and a constraint error on the same field share one {@code errors} key;
+	 * or {@code null} when the failure points at no field (a non-object JSON root).
 	 */
-	private static String fieldPath(MismatchedInputException ex) {
+	private static String fieldPath(JacksonException ex) {
 		StringBuilder path = new StringBuilder();
 		for (JacksonException.Reference reference : ex.getPath()) {
 			String name = reference.getPropertyName();
-			if (name == null) {
-				continue;
+			if (name != null) {
+				if (!path.isEmpty()) {
+					path.append('.');
+				}
+				path.append(name);
+			} else if (reference.getIndex() >= 0 && !path.isEmpty()) {
+				path.append('[').append(reference.getIndex()).append(']');
 			}
-			if (!path.isEmpty()) {
-				path.append('.');
-			}
-			path.append(name);
 		}
 		return path.isEmpty() ? null : path.toString();
 	}
