@@ -423,6 +423,63 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void trimsNameSoSurroundingWhitespaceIsNotStored() throws Exception {
+		MvcResult created = mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-TRIM-NAME","name":"  Widget  ","price":1.00}
+								"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.name").value("Widget"))
+				.andReturn();
+
+		mockMvc.perform(get("/api/v1/products/{id}", readId(created)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Widget"));
+	}
+
+	@Test
+	void acceptsNameOf255CharactersAfterTrimmingSurroundingWhitespace() throws Exception {
+		String name = "N".repeat(255);
+
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-NAME-255","name":"  %s  ","price":1.00}
+								""".formatted(name)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.name").value(name));
+	}
+
+	@Test
+	void rejectsNameOf256AfterTrimmingWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-NAME-256","name":"  %s  ","price":1.00}
+								""".formatted("N".repeat(256))))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		assertThat(productCount("SKU-NAME-256")).isZero();
+	}
+
+	@Test
+	void rejectsWhitespaceOnlyNameWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-WS-NAME","name":"   ","price":1.00}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		assertThat(productCount("SKU-WS-NAME")).isZero();
+	}
+
+	@Test
 	void rejectsMissingNameWith400AndAddsNothing() throws Exception {
 		mockMvc.perform(post("/api/v1/products")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -737,6 +794,55 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
 				.andExpect(jsonPath("$.errors.name").exists());
+	}
+
+	@Test
+	void patchTrimsNameSoSurroundingWhitespaceIsNotStored() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-TRIMNAME", "Old name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"  Widget  ","version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Widget"))
+				.andExpect(jsonPath("$.version").value(1));
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Widget"));
+	}
+
+	@Test
+	void patchAcceptsNameOf255AfterTrimmingSurroundingWhitespace() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NAME255", "Name", null, "1.00");
+		String name = "N".repeat(255);
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"  %s  ","version":0}
+								""".formatted(name)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(name))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	@Test
+	void patchWithNameTrimmingToStoredValueKeepsVersion() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-SAMENAME", "Name", null, "1.00");
+
+		// " Name " strips to "Name", the stored value, so nothing is dirty and the
+		// version stays put — same no-change rule as a re-sent identical field.
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":" Name ","version":0}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Name"))
+				.andExpect(jsonPath("$.version").value(0));
 	}
 
 	@Test
