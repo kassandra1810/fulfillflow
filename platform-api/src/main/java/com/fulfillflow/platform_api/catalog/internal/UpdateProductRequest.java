@@ -49,7 +49,8 @@ class UpdateProductRequest {
 
 	@JsonProperty("name")
 	void setName(String name) {
-		this.name = name;
+		// Trimmed before validation, like POST (rule in ProductText).
+		this.name = ProductText.strip(name);
 		this.namePresent = true;
 	}
 

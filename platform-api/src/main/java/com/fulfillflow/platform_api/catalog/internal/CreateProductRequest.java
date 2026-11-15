@@ -14,8 +14,8 @@ public record CreateProductRequest(
 		@NotNull @Positive @Digits(integer = 17, fraction = 2) BigDecimal price) {
 
 	public CreateProductRequest {
-		// Leading/trailing whitespace is not part of the sku (spec), so "SKU-1 "
-		// is the same product as "SKU-1". Case is significant.
-		sku = sku == null ? null : sku.strip();
+		// Trimmed before validation (rule in ProductText). Case is significant.
+		sku = ProductText.strip(sku);
+		name = ProductText.strip(name);
 	}
 }
