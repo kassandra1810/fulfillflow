@@ -1,5 +1,6 @@
 package com.fulfillflow.platform_api.catalog.internal;
 
+import com.fulfillflow.platform_api.web.Paging;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -19,11 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/products")
 public class ProductController {
-
-	private static final int MAX_PAGE_SIZE = 100;
-
-	/** Highest page whose row offset (page * size) still fits the int the database query takes. */
-	private static final int MAX_PAGE = Integer.MAX_VALUE / MAX_PAGE_SIZE;
 
 	private final ProductService service;
 
@@ -51,8 +47,8 @@ public class ProductController {
 	@GetMapping
 	PagedModel<ProductResponse> list(
 			@RequestParam(required = false) String sku,
-			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
-			@RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) int size) {
+			@RequestParam(defaultValue = "0") @Min(0) @Max(Paging.MAX_PAGE) int page,
+			@RequestParam(defaultValue = "" + Paging.DEFAULT_SIZE) @Min(1) @Max(Paging.MAX_SIZE) int size) {
 		return new PagedModel<>(service.list(sku, page, size).map(ProductResponse::from));
 	}
 
