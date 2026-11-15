@@ -19,14 +19,37 @@ class ApiErrorFormatIT extends AbstractPostgresIntegrationTest {
 	MockMvc mockMvc;
 
 	@Test
-	void unreadableBodyIs400ProblemDetail() throws Exception {
+	void wrongFieldTypeIs400ProblemDetailPointingAtTheField() throws Exception {
 		mockMvc.perform(post("/api/v1/products")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"sku":"SKU-BAD-JSON","name":"Bad","price":"abc"}
+								{"sku":"SKU-BAD-TYPE","name":"Bad","price":"abc"}
 								"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.errors.price").exists());
+	}
+
+	@Test
+	void malformedJsonIs400ProblemDetailWithoutErrors() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"sku\":"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.errors").doesNotExist());
+	}
+
+	@Test
+	void nonObjectJsonRootIs400ProblemDetailWithoutErrors() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("[]"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.errors").doesNotExist());
 	}
 }
