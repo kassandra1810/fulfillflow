@@ -39,10 +39,32 @@ class Product {
 		this.sku = sku;
 		this.name = name;
 		this.description = description;
-		// Always scale 2, like NUMERIC(19,2), so POST and GET return the same price
-		// (19.90, not 19.9). Validation already rejects more than 2 decimals, so
-		// this never rounds; setScale throws if it ever would.
-		this.price = price.setScale(2);
+		this.price = scaled(price);
+	}
+
+	/**
+	 * Changes the name. State changes go through this method, not a public setter,
+	 * so the entity stays in control of its own state.
+	 */
+	void changeName(String name) {
+		this.name = name;
+	}
+
+	/** Changes the description; a {@code null} clears it (PATCH "description": null). */
+	void changeDescription(String description) {
+		this.description = description;
+	}
+
+	/** Changes the price, normalized to scale 2 like the constructor. */
+	void changePrice(BigDecimal price) {
+		this.price = scaled(price);
+	}
+
+	// Always scale 2, like NUMERIC(19,2), so POST, PATCH and GET return the same
+	// price (19.90, not 19.9). Validation already rejects more than 2 decimals, so
+	// this never rounds; setScale throws if it ever would.
+	private static BigDecimal scaled(BigDecimal price) {
+		return price.setScale(2);
 	}
 
 	UUID getId() {
