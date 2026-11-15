@@ -60,4 +60,24 @@ class StockMovement {
 		return new StockMovement(id, MovementType.RECEIPT, productId, warehouseId,
 				quantity, createdAt, stockReceiptId);
 	}
+
+	UUID getId() {
+		return id;
+	}
+
+	MovementType getType() {
+		return type;
+	}
+
+	long getQuantity() {
+		return quantity;
+	}
+
+	Instant getCreatedAt() {
+		return createdAt;
+	}
+
+	UUID getStockReceiptId() {
+		return stockReceiptId;
+	}
 }

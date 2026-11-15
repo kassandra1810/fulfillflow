@@ -4,6 +4,10 @@ import com.fulfillflow.platform_api.catalog.CatalogApi;
 import com.fulfillflow.platform_api.shared.UuidV7;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +62,20 @@ class StockService {
 		return stockLevels.findByProductIdAndWarehouseId(productId, DEFAULT_WAREHOUSE_ID)
 				.map(StockLevelResponse::from)
 				.orElse(StockLevelResponse.EMPTY);
+	}
+
+	/**
+	 * One page of a product's movement history, newest first: {@code createdAt}
+	 * descending, ties broken by {@code id} descending. The order is fixed here,
+	 * not chosen by the client (spec "Paginacja"). An unknown product is a 404; a
+	 * product with no movements yields an empty page, never an error.
+	 */
+	@Transactional(readOnly = true)
+	Page<StockMovement> movementsOf(UUID productId, int page, int size) {
+		requireProduct(productId);
+		Pageable pageable = PageRequest.of(page, size,
+				Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+		return movements.findByProductId(productId, pageable);
 	}
 
 	private void requireProduct(UUID productId) {
