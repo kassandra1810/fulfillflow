@@ -241,9 +241,52 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 								{"sku":"SKU-STRING-PRICE","name":"String priced","price":"19.90"}
 								"""))
 				.andExpect(status().isBadRequest())
-				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.price").exists());
 
 		assertThat(productCount("SKU-STRING-PRICE")).isZero();
+	}
+
+	@Test
+	void rejectsNumberForNameWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-NUM-NAME","name":123,"price":1.00}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		assertThat(productCount("SKU-NUM-NAME")).isZero();
+	}
+
+	@Test
+	void rejectsNumberForSkuWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":123,"name":"Numbered sku","price":1.00}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.sku").exists());
+
+		assertThat(productCount("123")).isZero();
+	}
+
+	@Test
+	void rejectsBooleanForDescriptionWith400AndAddsNothing() throws Exception {
+		mockMvc.perform(post("/api/v1/products")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"sku":"SKU-BOOL-DESC","name":"Bool desc","description":true,"price":1.00}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.description").exists());
+
+		assertThat(productCount("SKU-BOOL-DESC")).isZero();
 	}
 
 	@Test
@@ -810,8 +853,8 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
-	void patchWithUnparsableBodyReturns400() throws Exception {
-		String id = createDetailedProduct("SKU-PATCH-UNPARSABLE", "Name", null, "1.00");
+	void patchWithStringPriceReturns400WithErrorsPrice() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-STRINGPRICE", "Name", null, "1.00");
 
 		mockMvc.perform(patch("/api/v1/products/{id}", id)
 						.contentType(MediaType.APPLICATION_JSON)
@@ -819,7 +862,61 @@ class ProductIT extends AbstractPostgresIntegrationTest {
 								{"price":"abc","version":0}
 								"""))
 				.andExpect(status().isBadRequest())
-				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.price").exists());
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void patchWithNumberForNameReturns400AndKeepsVersion() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NUMNAME", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":123,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.name").exists());
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.name").value("Name"))
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void patchWithNumberForDescriptionReturns400AndKeepsVersion() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-NUMDESC", "Name", "Desc", "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"description":123,"version":0}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.description").exists());
+
+		mockMvc.perform(get("/api/v1/products/{id}", id))
+				.andExpect(jsonPath("$.description").value("Desc"))
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void patchWithVersionAsStringReturns400() throws Exception {
+		String id = createDetailedProduct("SKU-PATCH-VERSTR", "Name", null, "1.00");
+
+		mockMvc.perform(patch("/api/v1/products/{id}", id)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"New","version":"0"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.version").exists());
 	}
 
 	@Test

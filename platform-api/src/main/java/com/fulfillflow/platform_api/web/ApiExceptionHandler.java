@@ -8,12 +8,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.exc.InputCoercionException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * The single place that renders API errors as RFC 9457 Problem Details, for
@@ -54,6 +58,56 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			}
 		}
 		return handleExceptionInternal(ex, ValidationFailedException.body(errors), headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	/**
+	 * A body whose JSON is well-formed but has a field of the wrong type (a number
+	 * or boolean where a {@code String} is expected, a string where a number is
+	 * expected, a fractional value for an integer field, a number out of the
+	 * field's range, ...) becomes a 400 with
+	 * {@code errors.<field>}, like every other validation 400 — not a bare "could
+	 * not read" message. Syntactically broken JSON, an empty body and a JSON root
+	 * that is not an object keep the default 400 Problem Details without an
+	 * {@code errors} map, because no single field is at fault.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(
+			HttpMessageNotReadableException ex,
+			HttpHeaders headers,
+			HttpStatusCode status,
+			WebRequest request) {
+		if (ex.getCause() instanceof JacksonException cause
+				&& (cause instanceof MismatchedInputException || cause instanceof InputCoercionException)) {
+			String field = fieldPath(cause);
+			if (field != null) {
+				Map<String, String> errors = Map.of(field, "has an invalid type");
+				return handleExceptionInternal(
+						ex, ValidationFailedException.body(errors), headers, HttpStatus.BAD_REQUEST, request);
+			}
+		}
+		return super.handleHttpMessageNotReadable(ex, headers, status, request);
+	}
+
+	/**
+	 * The path of the field that failed to bind, named like Bean Validation names
+	 * it ({@code price}, {@code outer.inner}, {@code lines[0].quantity}) so a type
+	 * error and a constraint error on the same field share one {@code errors} key;
+	 * or {@code null} when the failure points at no field (a non-object JSON root).
+	 */
+	private static String fieldPath(JacksonException ex) {
+		StringBuilder path = new StringBuilder();
+		for (JacksonException.Reference reference : ex.getPath()) {
+			String name = reference.getPropertyName();
+			if (name != null) {
+				if (!path.isEmpty()) {
+					path.append('.');
+				}
+				path.append(name);
+			} else if (reference.getIndex() >= 0 && !path.isEmpty()) {
+				path.append('[').append(reference.getIndex()).append(']');
+			}
+		}
+		return path.isEmpty() ? null : path.toString();
 	}
 
 	@Override

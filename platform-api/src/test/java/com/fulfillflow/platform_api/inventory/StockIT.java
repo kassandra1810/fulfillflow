@@ -125,7 +125,8 @@ class StockIT extends AbstractPostgresIntegrationTest {
 								{"productId":"%s","quantity":"5"}
 								""".formatted(productId)))
 				.andExpect(status().isBadRequest())
-				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.quantity").exists());
 
 		expectNoStock(productId);
 	}
