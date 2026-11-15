@@ -49,9 +49,7 @@ class UpdateProductRequest {
 
 	@JsonProperty("name")
 	void setName(String name) {
-		// Trim like POST (one rule, in ProductText) so the constraints validated below
-		// via CreateProductRequest see the trimmed value. A sent name that strips to
-		// the stored value is no change.
+		// Trimmed before validation, like POST (rule in ProductText).
 		this.name = ProductText.strip(name);
 		this.namePresent = true;
 	}
