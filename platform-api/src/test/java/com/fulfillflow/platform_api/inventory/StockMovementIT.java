@@ -206,6 +206,26 @@ class StockMovementIT extends AbstractPostgresIntegrationTest {
 	}
 
 	@Test
+	void rejectsNonNumericSizeWith400() throws Exception {
+		String productId = createProduct("SKU-MOVES-NAN-SIZE");
+
+		mockMvc.perform(get(movementsPath(productId)).param("size", "abc"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.size").exists());
+	}
+
+	@Test
+	void rejectsPageWhoseOffsetDoesNotFitTheDatabaseWith400() throws Exception {
+		String productId = createProduct("SKU-MOVES-HUGE-PAGE");
+
+		mockMvc.perform(get(movementsPath(productId)).param("page", "30000000").param("size", "100"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+				.andExpect(jsonPath("$.errors.page").exists());
+	}
+
+	@Test
 	void doesNotAllowDeletingHistory() throws Exception {
 		String productId = createProduct("SKU-MOVES-NO-DELETE");
 
