@@ -175,6 +175,10 @@ Dotyczy `GET /products` i `GET /products/{id}/stock-movements`.
 
 - Semantyka `PATCH`: pominięte pole bez zmian; `"description": null` czyści opis; `"name": null` lub `"price": null` to błąd walidacji; `sku` w treści → 400.
 - Wersjonowanie optymistyczne na `Product.version`; niezgodna wersja → 409.
+- **[SPEC]** `version` z żądania jest porównywane jawnie z wersją w bazie (samo `@Version` nie daje 409, bo encja jest ładowana z bazy). Dwie równoczesne edycje z tą samą `version`: jedna 200, druga 409 (nie 500) — `@Version` przy flushu tłumaczone na 409.
+- **[SPEC]** `sku` w treści → 400 także jako `"sku": null`; brak lub `"version": null` → 400. Kolejność błędów: 400 (walidacja) → 404 (brak produktu) → 409 (niezgodna `version`).
+- **[SPEC]** Reguły `name`/`price` i komunikaty błędów są te same co przy tworzeniu (jedno źródło ograniczeń). Odpowiedź PATCH niesie nową `version`.
+- **[SPEC]** PATCH, który niczego nie zmienia (tylko `version` albo te same wartości), → 200 z niezmienioną `version` (bez wymuszonego podbicia).
 
 ### Rezerwacja (PRD 6.1, ADR 0001)
 

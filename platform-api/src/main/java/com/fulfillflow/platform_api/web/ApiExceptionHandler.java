@@ -35,7 +35,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
 			errors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
 		}
-		ProblemDetail body = validationFailed(errors);
+		ProblemDetail body = ValidationFailedException.body(errors);
 
 		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
 	}
@@ -53,7 +53,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 				errors.putIfAbsent(parameter, error.getDefaultMessage());
 			}
 		}
-		return handleExceptionInternal(ex, validationFailed(errors), headers, HttpStatus.BAD_REQUEST, request);
+		return handleExceptionInternal(ex, ValidationFailedException.body(errors), headers, HttpStatus.BAD_REQUEST, request);
 	}
 
 	@Override
@@ -63,10 +63,6 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			HttpStatusCode status,
 			WebRequest request) {
 		Map<String, String> errors = Map.of(ex.getPropertyName(), "has an invalid format");
-		return handleExceptionInternal(ex, validationFailed(errors), headers, HttpStatus.BAD_REQUEST, request);
-	}
-
-	private static ProblemDetail validationFailed(Map<String, String> errors) {
-		return ValidationFailedException.body(errors);
+		return handleExceptionInternal(ex, ValidationFailedException.body(errors), headers, HttpStatus.BAD_REQUEST, request);
 	}
 }
