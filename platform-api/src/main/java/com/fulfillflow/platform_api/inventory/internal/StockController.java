@@ -17,9 +17,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Inventory HTTP endpoints: receiving stock and reading a product's stock. Both
- * use the module's internal {@link StockService}; existence of the product is
- * checked through the catalog's public API, yielding 404 for an unknown one.
+ * Inventory HTTP endpoints: receiving stock, reading a product's stock, and
+ * reading its movement history. All use the module's internal {@link StockService};
+ * existence of the product is checked through the catalog's public API, yielding
+ * 404 for an unknown one.
  */
 @RestController
 @RequestMapping("/api/v1")
